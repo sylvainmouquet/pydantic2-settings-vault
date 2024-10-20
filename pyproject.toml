@@ -44,15 +44,20 @@ build-backend = "hatchling.build"
 dev-dependencies = [
     "aiohttp>=3.10.6",
     "pip>=24.2",
+    "pydocks>=1.1.1",
     "pytest>=8.3.3",
     "pytest-asyncio>=0.24.0",
     "pytest-mock>=3.14.0",
-    "ruff>=0.6.7"
+    "ruff>=0.6.7",
+    "anyio>=4.6.2.post1",
+    "python-on-whales>=0.73.0",
+    "asyncpg>=0.30.0",
+    "loguru>=0.7.2",
 ]
-
 
 [tool.uv.sources]
 concurrency-pydantic2-settings-vault = { path = "pydantic2_settings_vault" }
+pydocks = { path = "../pydocks" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["pydantic2_settings_vault"]

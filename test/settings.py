@@ -1,48 +1,27 @@
-import json
-import logging
-import logging.handlers
-import os
-import sys
-from enum import Enum
 from functools import lru_cache
 from threading import Lock
-from typing import Any, Tuple, Type
+from typing import Tuple, Type
 
 from pydantic import Field, SecretStr
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
-    SettingsConfigDict,
 )
 
 from pydantic2_settings_vault import VaultConfigSettingsSource
 
-env_file: str = ".env.test" if "PYTEST_VERSION" in os.environ else f".env"
+# env_file: str = ".env.test" if "PYTEST_VERSION" in os.environ else f".env"
+
 
 class AppSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=env_file, extra="ignore")
-
-    # https://hub.docker.com/r/hashicorp/vault/tags
-    TEST_VAULT_DOCKER_IMAGE: str = "docker.io/hashicorp/vault:1.17.3"
-
-    VAULT_URL: str = Field(default="https://vault.idum.cloud")
-
-    AES_KEY: SecretStr = Field(
-        ...,
-        json_schema_extra={
-            "vault_secret_path": f"secrets/data",
-            "vault_secret_key": "AES_KEY",  # pragma: allowlist secret
-        },
-    )
-
     @classmethod
     def settings_customise_sources(
-        cls,
-        settings_cls: Type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,
-        env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
+            cls,
+            settings_cls: Type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
     ) -> Tuple[PydanticBaseSettingsSource, ...]:
         return (
             init_settings,
@@ -51,9 +30,36 @@ class AppSettings(BaseSettings):
             VaultConfigSettingsSource(settings_cls=settings_cls),
         )
 
+class ValidAppSettings(AppSettings):
+    # model_config = SettingsConfigDict(env_file=env_file, extra="ignore")
+
+    FOO: SecretStr = Field(
+        ...,
+        json_schema_extra={
+            "vault_secret_path": "secret/data/test",
+            "vault_secret_key": "FOO",  # pragma: allowlist secret
+        },
+    )
+
+
+class InvalidAppSettings(AppSettings):
+
+    UNKNOWN: SecretStr = Field(
+        ...,
+        json_schema_extra={
+            "vault_secret_path": "secret/data/test",
+            "vault_secret_key": "UNKNOWN",  # pragma: allowlist secret
+        },
+    )
+
 app_settings_lock = Lock()
 
 @lru_cache
-def get_app_settings() -> AppSettings:
+def get_valid_app_settings() -> ValidAppSettings:
     with app_settings_lock:
-        return AppSettings()  # type: ignore
+        return ValidAppSettings()  # type: ignore
+
+@lru_cache
+def get_invalid_app_settings() -> InvalidAppSettings:
+    with app_settings_lock:
+        return InvalidAppSettings()  # type: ignore
