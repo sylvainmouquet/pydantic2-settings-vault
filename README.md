@@ -42,9 +42,11 @@ class AppSettings(BaseSettings):
 # The connection to Vault is done is via HTTP with AppRole authentication
 import os
 os.environ['VAULT_URL'] = "<configure it>"
-os.environ['VAULT_NAMESPACE'] = "<configure it>"
 os.environ['VAULT_ROLE_ID'] = "<configure it>"
 os.environ['VAULT_SECRET_ID'] = "<configure it>"
+
+# Only with Enterprise edition
+os.environ['VAULT_NAMESPACE'] = "<configure it>"
 
 ```
 
