@@ -26,9 +26,23 @@ runs:
       shell: bash
     - name: Run tests
       run: |
-        source .venv/bin/activate
-        sudo echo "172.17.0.1 host.docker.internal" | sudo tee -a /etc/hosts
-        ping -c 2 host.docker.internal
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          ifconfig
+          source .venv/bin/activate
+          sudo echo "172.17.0.1 host.docker.internal" | sudo tee -a /etc/hosts
+          ping -c 2 host.docker.internal
+
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          ifconfig
+          source .venv/bin/activate
+          sudo echo "172.17.0.1 host.docker.internal" | sudo tee -a /etc/hosts
+          ping -c 2 host.docker.internal
+
+        elif [ "$RUNNER_OS" == "Windows" ]; then
+          .\.venv\Scripts\activate
+          echo "172.17.0.1 host.docker.internal" | Out-File -Append -FilePath $env:windir\System32\drivers\etc\hosts
+          Test-Connection -ComputerName host.docker.internal -Count 2
+        fi
         
         make test
       shell: bash
