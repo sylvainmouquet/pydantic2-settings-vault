@@ -36,7 +36,7 @@ runs:
 
         elif [ "$RUNNER_OS" == "macOS" ]; then
           # ifconfig
-          docker_ip=$(ip addr show docker0 | grep -Po 'inet \K[\d.]+')
+          docker_ip=$(ifconfig en0 | awk '/inet / {print $2}')
           echo "Docker IP: $docker_ip"
 
           source .venv/bin/activate
@@ -44,7 +44,8 @@ runs:
           ping -c 2 host.docker.internal
 
         elif [ "$RUNNER_OS" == "Windows" ]; then
-          .\.venv\Scripts\activate
+          # .\.venv\Scripts\activate
+          ipconfig
           echo "172.17.0.1 host.docker.internal" | Out-File -Append -FilePath $env:windir\System32\drivers\etc\hosts
           Test-Connection -ComputerName host.docker.internal -Count 2
         fi
