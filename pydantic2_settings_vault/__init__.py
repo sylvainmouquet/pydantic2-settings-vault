@@ -6,7 +6,6 @@ import logging
 import concurrent.futures
 import os
 from typing import Any, Tuple
-from dotenv import load_dotenv
 
 from concurrency_limiter import concurrency_limiter
 from pydantic import SecretStr
@@ -29,11 +28,14 @@ logger.addHandler(logging.NullHandler())
 CONST_HEADER_X_VAULT_TOKEN: str = "X-Vault-Token"
 CONST_HEADER_X_VAULT_NAMESPACE: str = "X-Vault-Namespace"
 
+
 class InternalHttpVault:
     token: SecretStr
     session: ClientSession
 
-    def __init__(self, url: str, namespace: str | None, role_id: SecretStr, secret_id: SecretStr):
+    def __init__(
+        self, url: str, namespace: str | None, role_id: SecretStr, secret_id: SecretStr
+    ):
         self.url = url
         self.namespace = namespace
         self.role_id = role_id
@@ -53,9 +55,7 @@ class InternalHttpVault:
             if self.namespace:
                 headers[CONST_HEADER_X_VAULT_NAMESPACE] = self.namespace
             async with self.session.post(
-                f"{self.url}/v1/auth/approle/login",
-                json=data,
-                headers=headers
+                f"{self.url}/v1/auth/approle/login", json=data, headers=headers
             ) as response:
                 if response.status == HTTPStatus.OK:
                     response_data = await response.json()
@@ -120,8 +120,6 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
         return value
 
     def __call__(self) -> dict[str, Any]:
-        load_dotenv(".env")
-
         vault_url: str = os.getenv("VAULT_URL", default="http://127.0.0.1:8200")
         vault_namespace: str | None = os.getenv("VAULT_NAMESPACE")
         vault_role_id: SecretStr = SecretStr(os.getenv("VAULT_ROLE_ID"))
@@ -129,7 +127,7 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
 
         if not vault_role_id or not vault_secret_id:
             raise ValueError("VAULT_ROLE_ID and VAULT_SECRET_ID are mandatory")
-        
+
         d: dict[str, Any] = {}
 
         async def _get_list_vault_paths() -> list[str]:
@@ -156,7 +154,10 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
             k: dict[str, Any] = {}
 
             async with InternalHttpVault(
-                url=vault_url, namespace=vault_namespace, role_id=vault_role_id, secret_id=vault_secret_id
+                url=vault_url,
+                namespace=vault_namespace,
+                role_id=vault_role_id,
+                secret_id=vault_secret_id,
             ) as vault:
                 vault_path_list: list[str] = await _get_list_vault_paths()
                 vault_secrets_list: list[dict[str, SecretStr]] = await asyncio.gather(
