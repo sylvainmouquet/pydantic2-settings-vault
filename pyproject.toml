@@ -50,8 +50,9 @@ dev-dependencies = [
     "ruff>=0.6.7"
 ]
 
+
 [tool.uv.sources]
-pydantic2-settings-vault = { path = "pydantic2-settings-vault" }
+concurrency-pydantic2-settings-vault = { path = "pydantic2_settings_vault" }
 
 [tool.hatch.build.targets.wheel]
-packages = ["pydantic2-settings-vault"]
+packages = ["pydantic2_settings_vault"]

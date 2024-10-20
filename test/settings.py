@@ -15,6 +15,8 @@ from pydantic_settings import (
     SettingsConfigDict,
 )
 
+from pydantic2_settings_vault import VaultConfigSettingsSource
+
 env_file: str = ".env.test" if "PYTEST_VERSION" in os.environ else f".env"
 
 class AppSettings(BaseSettings):
@@ -52,7 +54,6 @@ class AppSettings(BaseSettings):
 app_settings_lock = Lock()
 
 @lru_cache
-# @logfire.instrument("Load settings", extract_args=True)
 def get_app_settings() -> AppSettings:
     with app_settings_lock:
         return AppSettings()  # type: ignore
