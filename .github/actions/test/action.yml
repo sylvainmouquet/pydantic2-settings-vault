@@ -27,15 +27,20 @@ runs:
     - name: Run tests
       run: |
         if [ "$RUNNER_OS" == "Linux" ]; then
-          ifconfig
+          # ifconfig
+          docker_ip=$(ip addr show docker0 | grep -Po 'inet \K[\d.]+')
+          echo "Docker IP: $docker_ip"
           source .venv/bin/activate
-          sudo echo "172.17.0.1 host.docker.internal" | sudo tee -a /etc/hosts
+          sudo echo "$docker_ip host.docker.internal" | sudo tee -a /etc/hosts
           ping -c 2 host.docker.internal
 
         elif [ "$RUNNER_OS" == "macOS" ]; then
-          ifconfig
+          # ifconfig
+          docker_ip=$(ip addr show docker0 | grep -Po 'inet \K[\d.]+')
+          echo "Docker IP: $docker_ip"
+
           source .venv/bin/activate
-          sudo echo "172.17.0.1 host.docker.internal" | sudo tee -a /etc/hosts
+          sudo echo "$docker_ip host.docker.internal" | sudo tee -a /etc/hosts
           ping -c 2 host.docker.internal
 
         elif [ "$RUNNER_OS" == "Windows" ]; then
