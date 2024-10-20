@@ -1,0 +1,188 @@
+__version__ = "0.0.1"
+__all__ = ("__version__", "VaultConfigSettingsSource")
+
+import asyncio
+import logging
+import asyncio
+import concurrent.futures
+import os
+from typing import Any, Tuple
+from dotenv import load_dotenv
+
+from concurrency_limiter import concurrency_limiter
+from pydantic import SecretStr
+from pydantic.fields import FieldInfo
+from pydantic_settings import (
+    PydanticBaseSettingsSource,
+)
+
+from http import HTTPStatus
+
+import aiohttp
+from aiohttp import ClientSession
+from pydantic import SecretStr
+
+
+from reattempt import reattempt
+logger = logging.getLogger("pydantic2-settings-vault")
+logger.addHandler(logging.NullHandler())
+
+CONST_HEADER_X_VAULT_TOKEN: str = "X-Vault-Token"
+
+class InternalHttpVault:
+    token: SecretStr
+    session: ClientSession
+
+    def __init__(self, url: str, role_id: SecretStr, secret_id: SecretStr):
+        self.url = url
+        self.role_id = role_id
+        self.secret_id = secret_id
+
+    async def __aenter__(self):
+        connector = aiohttp.TCPConnector(limit=10)
+        timeout = aiohttp.ClientTimeout(total=30)
+        self.session = ClientSession(connector=connector, timeout=timeout)
+
+        data = {
+            "role_id": self.role_id.get_secret_value(),
+            "secret_id": self.secret_id.get_secret_value(),
+        }
+        try:
+            async with self.session.post(f"{self.url}/v1/auth/approle/login", json=data) as response:
+                if response.status == HTTPStatus.OK:
+                    response_data = await response.json()
+                    self.token = SecretStr(response_data["auth"]["client_token"])
+                else:
+                    error_msg = await response.text()
+                    raise ValueError(
+                        f"Failed to authenticate. Error code: {response.status}. Error message: {error_msg}")
+        except Exception as e:
+            await self.session.close()
+            raise e
+
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        if self.session and not self.session.closed:
+            await self.session.close()
+
+    async def get_secrets(self, vault_path: str) -> dict[str, SecretStr]:
+        if not self.token:
+            raise ValueError("Authentication is mandatory")
+
+        try:
+            async with self.session.get(
+                    f"{self.url}/v1/{vault_path}",
+                    headers={CONST_HEADER_X_VAULT_TOKEN: self.token.get_secret_value()},
+            ) as response:
+                if response.status == HTTPStatus.OK:
+                    secrets = await response.json()
+                    result = {key: SecretStr(value) for key, value in secrets["data"]["data"].items()}
+                    return result
+                else:
+                    error_msg = await response.text()
+                    raise ValueError(
+                        f"Failed to retrieve secret. Error code: {response.status}. Error message: {error_msg}")
+        except Exception as e:
+            await self.session.close()
+            raise e
+
+
+
+class VaultConfigSettingsSource(PydanticBaseSettingsSource):
+    CONST_HEADER_X_VAULT_TOKEN: str = "X-Vault-Token"
+
+
+    def get_field_value(self, field: FieldInfo, field_name: str) -> Tuple[Any, str, bool]:
+        field_value = "test"
+        # print(field.json_schema_extra)
+        return field_value, field_name, False
+
+    def prepare_field_value(self, field_name: str, field: FieldInfo, value: Any, value_is_complex: bool) -> Any:
+        return value
+
+    # @logfire.instrument("Vault get Secrets", extract_args=True)
+    def __call__(self) -> dict[str, Any]:
+        # Pydantic uses the env file .env.{ENVIRONMENT_NAME} to set the environment variables.
+        # env_file: str = f".env.{ENVIRONMENT_NAME}"
+        # env_file_encoding: str = "utf-8"
+
+        # 'ENVIRONMENT_NAME' not in os.environ -> run tests from VCCode
+        if "ENVIRONMENT_NAME" not in os.environ or os.environ["ENVIRONMENT_NAME"] == "test":
+            load_dotenv('.env.test')
+
+            k: dict[str, Any] = {}
+            for _fieldname, field in filter(
+                lambda item: item[1].json_schema_extra,
+                self.settings_cls.model_fields.items(),
+            ):
+                vault_secret_key: str = field.json_schema_extra["vault_secret_key"]  # type: ignore
+                k[vault_secret_key] = SecretStr(os.getenv(vault_secret_key))
+            return k
+
+        load_dotenv('.env')
+
+        vault_url: str = os.getenv("VAULT_URL", default="https://vault.idum.cloud")
+        vault_role_id: SecretStr = SecretStr(os.getenv("vault_role_id"))
+        vault_secret_id: SecretStr = SecretStr(os.getenv("vault_secret_id"))
+
+        d: dict[str, Any] = {}
+
+        async def _get_list_vault_paths() -> list[str]:
+            """get the list of vault path defined in pydantic settings"""
+            vault_path_list: list[str] = []
+            for _fieldname, field in filter(
+                lambda item: item[1].json_schema_extra,
+                self.settings_cls.model_fields.items(),
+            ):
+                vault_path: str = field.json_schema_extra["vault_secret_path"]  # type: ignore
+                if vault_path not in vault_path_list:
+                    vault_path_list.append(vault_path)
+
+            return vault_path_list
+
+        @concurrency_limiter(max_concurrent=5)
+        async def _get_vault_secrets(_vault: InternalHttpVault, vault_path: str) -> dict[str, SecretStr]:
+            return await _vault.get_secrets(vault_path=vault_path)
+
+        @reattempt
+        async def get_secrets():
+            k: dict[str, Any] = {}
+
+            async with InternalHttpVault(url=vault_url, role_id=vault_role_id, secret_id=vault_secret_id) as vault:
+                vault_path_list: list[str] = await _get_list_vault_paths()
+                vault_secrets_list: list[dict[str, SecretStr]] = await asyncio.gather(*[_get_vault_secrets(_vault=vault, vault_path=vault_path) for vault_path in vault_path_list])
+
+            # Converting the list of dictionaries to a single dictionary
+            vault_secrets_dict: dict[str, SecretStr] = {}
+            for vault_secrets in vault_secrets_list:
+                vault_secrets_dict.update(vault_secrets)
+
+            for field_name, field in filter(
+                lambda item: item[1].json_schema_extra,
+                self.settings_cls.model_fields.items(),
+            ):
+                vault_secret_key: str = field.json_schema_extra["vault_secret_key"]  # type: ignore
+
+                if vault_secret_key in vault_secrets_dict:
+                    k[field_name] = vault_secrets_dict[vault_secret_key].get_secret_value()
+                else:
+                    logger.error("Key {vault_secret_key} not found in the Vault")
+            return k
+
+        def run_async_method():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            result = loop.run_until_complete(get_secrets())  # type: ignore
+            loop.close()
+            return result
+
+        # Create a thread and run the async method
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(run_async_method)
+
+        # Wait for the thread to complete and get the result
+        d = future.result()
+
+        return d
+

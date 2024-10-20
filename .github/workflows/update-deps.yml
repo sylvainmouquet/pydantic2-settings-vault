@@ -1,0 +1,70 @@
+name: Update PYTHON Dependencies
+
+on:
+  schedule:
+    - cron: '0 7 * * *'  # Runs every day at 7:00 AM
+  workflow_dispatch:  # Allows manual triggering of the workflow
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-deps:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.13
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+
+      - name: Use uv with Python version
+        run: uv venv --python 3.13
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Save check dependencies output (before)
+        id: check_deps_before
+        run: |
+          BEFORE=$(make check-deps) || true
+          echo "BEFORE=${BEFORE}"
+
+          echo "BEFORE<<EOF" >> $GITHUB_ENV
+          echo "$BEFORE" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Run make update
+        run: make update
+
+      - name: Run make check dependencies (after)
+        id: check_deps_after
+        run: |
+          after=$(make check-deps) || true
+          echo "AFTER=${AFTER}"
+
+          echo "AFTER<<EOF" >> $GITHUB_ENV
+          echo "$AFTER" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Create or Update Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          title: 'chore(deps): update python dependencies'
+          body: |
+            Automated update of uv.lock
+            
+            **Before:** 
+            ${{env.BEFORE}}
+            
+            **After:**
+            ${{env.AFTER}}
+          base: main
+          branch: update-python-dependencies
+          
