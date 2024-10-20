@@ -691,7 +691,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "aiohttp" },
     { name = "anyio" },
     { name = "asyncpg" },
     { name = "loguru" },
@@ -715,12 +714,11 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "aiohttp", specifier = ">=3.10.6" },
     { name = "anyio", specifier = ">=4.6.2.post1" },
     { name = "asyncpg", specifier = ">=0.30.0" },
     { name = "loguru", specifier = ">=0.7.2" },
     { name = "pip", specifier = ">=24.2" },
-    { name = "pydocks", directory = "../pydocks" },
+    { name = "pydocks", specifier = ">=1.2.0" },
     { name = "pytest", specifier = ">=8.3.3" },
     { name = "pytest-asyncio", specifier = ">=0.24.0" },
     { name = "pytest-mock", specifier = ">=3.14.0" },
@@ -730,28 +728,11 @@ dev = [
 
 [[package]]
 name = "pydocks"
-version = "1.0.2"
-source = { directory = "../pydocks" }
-dependencies = [
-    { name = "aiohttp" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "aiohttp", specifier = ">=3.10.10" }]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "anyio", specifier = ">=4.6.0" },
-    { name = "asyncpg", specifier = ">=0.30" },
-    { name = "loguru", specifier = ">=0.7.2" },
-    { name = "pip", specifier = ">=24.2" },
-    { name = "pytest", specifier = ">=8.3.3" },
-    { name = "pytest-asyncio", specifier = ">=0.24.0" },
-    { name = "pytest-mock", specifier = ">=3.14.0" },
-    { name = "python-on-whales", specifier = ">=0.73.0" },
-    { name = "reattempt", specifier = ">=0.0.1" },
-    { name = "reattempt", specifier = ">=1.0.10" },
-    { name = "ruff", specifier = ">=0.6.7" },
+version = "1.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/54/48/26ad2f1e9c952b452f6cc3a2c5008a354e0a1455273f475dde30cc11fe2b/pydocks-1.2.0.tar.gz", hash = "sha256:729b7f2174963ca214b9ac9e7cb9c22507c580bcba8c6d01bd2b3fc3ccf09781", size = 74949 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9b/aa/def66215ba9ac600a36b6ddebc4a19395dfec6d65f4f9efac0421310af5e/pydocks-1.2.0-py3-none-any.whl", hash = "sha256:6bc615f13743ad7ef1aa0a844bb50ebac6885d5d24e67fcc143a409b486ed25b", size = 8846 },
 ]
 
 [[package]]
