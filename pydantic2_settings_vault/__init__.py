@@ -27,14 +27,15 @@ logger = logging.getLogger("pydantic2-settings-vault")
 logger.addHandler(logging.NullHandler())
 
 CONST_HEADER_X_VAULT_TOKEN: str = "X-Vault-Token"
-
+CONST_HEADER_X_VAULT_NAMESPACE: str = "X-Vault-Namespace"
 
 class InternalHttpVault:
     token: SecretStr
     session: ClientSession
 
-    def __init__(self, url: str, role_id: SecretStr, secret_id: SecretStr):
+    def __init__(self, url: str, namespace: str | None, role_id: SecretStr, secret_id: SecretStr):
         self.url = url
+        self.namespace = namespace
         self.role_id = role_id
         self.secret_id = secret_id
 
@@ -48,8 +49,13 @@ class InternalHttpVault:
             "secret_id": self.secret_id.get_secret_value(),
         }
         try:
+            headers = {}
+            if self.namespace:
+                headers[CONST_HEADER_X_VAULT_NAMESPACE] = self.namespace
             async with self.session.post(
-                f"{self.url}/v1/auth/approle/login", json=data
+                f"{self.url}/v1/auth/approle/login",
+                json=data,
+                headers=headers
             ) as response:
                 if response.status == HTTPStatus.OK:
                     response_data = await response.json()
@@ -74,9 +80,12 @@ class InternalHttpVault:
             raise ValueError("Authentication is mandatory")
 
         try:
+            headers = {CONST_HEADER_X_VAULT_TOKEN: self.token.get_secret_value()}
+            if self.namespace:
+                headers[CONST_HEADER_X_VAULT_NAMESPACE] = self.namespace
             async with self.session.get(
                 f"{self.url}/v1/{vault_path}",
-                headers={CONST_HEADER_X_VAULT_TOKEN: self.token.get_secret_value()},
+                headers=headers,
             ) as response:
                 if response.status == HTTPStatus.OK:
                     secrets = await response.json()
@@ -114,9 +123,13 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
         load_dotenv(".env")
 
         vault_url: str = os.getenv("VAULT_URL", default="http://127.0.0.1:8200")
+        vault_namespace: str | None = os.getenv("VAULT_NAMESPACE")
         vault_role_id: SecretStr = SecretStr(os.getenv("VAULT_ROLE_ID"))
         vault_secret_id: SecretStr = SecretStr(os.getenv("VAULT_SECRET_ID"))
 
+        if not vault_role_id or not vault_secret_id:
+            raise ValueError("VAULT_ROLE_ID and VAULT_SECRET_ID are mandatory")
+        
         d: dict[str, Any] = {}
 
         async def _get_list_vault_paths() -> list[str]:
@@ -143,7 +156,7 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
             k: dict[str, Any] = {}
 
             async with InternalHttpVault(
-                url=vault_url, role_id=vault_role_id, secret_id=vault_secret_id
+                url=vault_url, namespace=vault_namespace, role_id=vault_role_id, secret_id=vault_secret_id
             ) as vault:
                 vault_path_list: list[str] = await _get_list_vault_paths()
                 vault_secrets_list: list[dict[str, SecretStr]] = await asyncio.gather(

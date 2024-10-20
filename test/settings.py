@@ -16,12 +16,12 @@ from pydantic2_settings_vault import VaultConfigSettingsSource
 class AppSettings(BaseSettings):
     @classmethod
     def settings_customise_sources(
-            cls,
-            settings_cls: Type[BaseSettings],
-            init_settings: PydanticBaseSettingsSource,
-            env_settings: PydanticBaseSettingsSource,
-            dotenv_settings: PydanticBaseSettingsSource,
-            file_secret_settings: PydanticBaseSettingsSource,
+        cls,
+        settings_cls: Type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
     ) -> Tuple[PydanticBaseSettingsSource, ...]:
         return (
             init_settings,
@@ -29,6 +29,7 @@ class AppSettings(BaseSettings):
             dotenv_settings,
             VaultConfigSettingsSource(settings_cls=settings_cls),
         )
+
 
 class ValidAppSettings(AppSettings):
     # model_config = SettingsConfigDict(env_file=env_file, extra="ignore")
@@ -43,7 +44,6 @@ class ValidAppSettings(AppSettings):
 
 
 class InvalidAppSettings(AppSettings):
-
     UNKNOWN: SecretStr = Field(
         ...,
         json_schema_extra={
@@ -52,12 +52,15 @@ class InvalidAppSettings(AppSettings):
         },
     )
 
+
 app_settings_lock = Lock()
+
 
 @lru_cache
 def get_valid_app_settings() -> ValidAppSettings:
     with app_settings_lock:
         return ValidAppSettings()  # type: ignore
+
 
 @lru_cache
 def get_invalid_app_settings() -> InvalidAppSettings:

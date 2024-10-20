@@ -1,15 +1,17 @@
 import pytest
 from pydantic_core._pydantic_core import ValidationError
 
-from test.settings import get_valid_app_settings, AppSettings, ValidAppSettings, InvalidAppSettings, \
-    get_invalid_app_settings
+from test.settings import (
+    get_valid_app_settings,
+    ValidAppSettings,
+    get_invalid_app_settings,
+)
 from loguru import logger
 import os
 
 
 @pytest.mark.asyncio
 async def test_valid_get_secret(disable_logging_exception, vault_container):
-
     # Read the vault credentials from the file
     credentials = vault_container.execute(["cat", "/vault-credentials.env"])
     credentials_dict = dict(line.split("=") for line in credentials.splitlines())
@@ -28,9 +30,9 @@ async def test_valid_get_secret(disable_logging_exception, vault_container):
     assert settings.FOO.get_secret_value() == "BAR"
     logger.info("Secret Found")
 
+
 @pytest.mark.asyncio
 async def test_invalid_get_secret(disable_logging_exception, vault_container):
-
     # Read the vault credentials from the file
     credentials = vault_container.execute(["cat", "/vault-credentials.env"])
     credentials_dict = dict(line.split("=") for line in credentials.splitlines())
@@ -46,6 +48,5 @@ async def test_invalid_get_secret(disable_logging_exception, vault_container):
     )
 
     with pytest.raises(ValidationError):
-
         # the secret UNKNOWN is not found
         get_invalid_app_settings()
