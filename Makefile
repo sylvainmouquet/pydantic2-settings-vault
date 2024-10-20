@@ -27,7 +27,7 @@ build: check-version
 #	ls -al
 	./scripts/version.sh "${VERSION}"
 	@cat pyproject.toml | grep version
-	@cat reattempt/__init__.py | grep version
+	@cat pydantic2_settings_vault/__init__.py | grep version
 	uv build
 
 .PHONY: check-version
