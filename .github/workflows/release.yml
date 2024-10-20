@@ -27,7 +27,12 @@ jobs:
         run: uv venv --python 3.13
       - run: make install
       - run: make build
-      - run: make test
+      - run: |
+          source .venv/bin/activate
+          sudo echo "172.17.0.1 host.docker.internal" | sudo tee -a /etc/hosts
+          ping -c 2 host.docker.internal
+
+          make test
       - name: mint API token
         id: mint-token
         run: |

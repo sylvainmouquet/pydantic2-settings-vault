@@ -25,7 +25,12 @@ runs:
       run: make build
       shell: bash
     - name: Run tests
-      run: make test
+      run: |
+        source .venv/bin/activate
+        sudo echo "172.17.0.1 host.docker.internal" | sudo tee -a /etc/hosts
+        ping -c 2 host.docker.internal
+        
+        make test
       shell: bash
       env:
         PYTHON_VERSION: ${{ matrix.python-version }}
