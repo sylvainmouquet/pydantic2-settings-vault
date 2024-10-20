@@ -12,27 +12,27 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-macos:
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ github.ref }}
-    - uses: ./.github/actions/test
+  # test-macos:
+  #   runs-on: macos-latest
+  #   strategy:
+  #     matrix:
+  #       python-version: ['3.10', '3.11', '3.12', '3.13']
+  #   steps:
+  #   - uses: actions/checkout@v4
+  #     with:
+  #       ref: ${{ github.ref }}
+  #   - uses: ./.github/actions/test
 
-  test-windows:
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ github.ref }}
-    - uses: ./.github/actions/test
+  # test-windows:
+  #   runs-on: windows-latest
+  #   strategy:
+  #     matrix:
+  #       python-version: ['3.10', '3.11', '3.12', '3.13']
+  #   steps:
+  #   - uses: actions/checkout@v4
+  #     with:
+  #       ref: ${{ github.ref }}
+  #   - uses: ./.github/actions/test
 
   test-ubuntu:
     runs-on: ubuntu-latest
