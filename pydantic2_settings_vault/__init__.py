@@ -125,7 +125,7 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
         vault_role_id: SecretStr = SecretStr(os.getenv("VAULT_ROLE_ID"))
         vault_secret_id: SecretStr = SecretStr(os.getenv("VAULT_SECRET_ID"))
 
-        if not vault_role_id or not vault_secret_id:
+        if not vault_role_id.get_secret_value() or not vault_secret_id.get_secret_value():
             raise ValueError("VAULT_ROLE_ID and VAULT_SECRET_ID are mandatory")
 
         d: dict[str, Any] = {}
