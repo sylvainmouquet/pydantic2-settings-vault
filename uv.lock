@@ -728,11 +728,11 @@ dev = [
 
 [[package]]
 name = "pydocks"
-version = "1.2.0"
+version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/54/48/26ad2f1e9c952b452f6cc3a2c5008a354e0a1455273f475dde30cc11fe2b/pydocks-1.2.0.tar.gz", hash = "sha256:729b7f2174963ca214b9ac9e7cb9c22507c580bcba8c6d01bd2b3fc3ccf09781", size = 74949 }
+sdist = { url = "https://files.pythonhosted.org/packages/46/8f/91f8bfe7e632cdc65897d12f5047bea612696927046ad9f42ac1e0952bb5/pydocks-1.3.1.tar.gz", hash = "sha256:4f239038e43390b79b8fbfa8b96ce634cfdcbca8190ad38f97b08650caf897bd", size = 76369 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9b/aa/def66215ba9ac600a36b6ddebc4a19395dfec6d65f4f9efac0421310af5e/pydocks-1.2.0-py3-none-any.whl", hash = "sha256:6bc615f13743ad7ef1aa0a844bb50ebac6885d5d24e67fcc143a409b486ed25b", size = 8846 },
+    { url = "https://files.pythonhosted.org/packages/5a/e8/a1b8f74d71834849c3d5b147696a3edb00ea4ae4c63151c660a37ccde036/pydocks-1.3.1-py3-none-any.whl", hash = "sha256:a25da9983dfc30c5afc89d5c8544cf0651a53a05f80a3abc80d38ce8f205b8bd", size = 9992 },
 ]
 
 [[package]]
