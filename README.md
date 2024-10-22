@@ -2,26 +2,6 @@
 
 Pydantic2-Settings-Vault is a simple extension of Pydantic Settings to collect secrets from HashiCorp Vault OpenSource (OSS) and Enterprise
 
-```mermaid
-sequenceDiagram
-    participant A as Your Application
-    participant B as BaseSettings
-    participant V as Vault
-    note over A,B: 1. Retrieve settings
-    A->>B: get_app_settings()
-    note over B: 2. Group secrets paths
-    B->>B: group_secrets_paths()
-    note over B,V: 3. Asynchronously fetch secrets by path from Vault
-    B->>V: get_secrets(secrets/data/<A>)
-    B->>V: get_secrets(secrets/data/<B>)
-    note over V,B: 4. Vault returns secrets
-    V->>B: return secrets for secrets/data/<A>
-    V->>B: return secrets for secrets/data/<B>
-    note over B: 5. Fill fields with secrets values
-    B->>B: SECRET_ONE => secrets/data/<A>[SECRET_ONE] <br> SECRET_TWO => secrets/data/<A>[SECRET_TWO] <br> SECRET_THREE => secrets/data/<B>[SECRET_THREE]
-    note over B,A: 6. Return settings
-    B->>A: settings with variables and secrets
-```
 
 ### Demonstration:
 
@@ -78,6 +58,27 @@ app_settings_lock = Lock()
 def get_app_settings() -> AppSettings:
     with app_settings_lock:
         return AppSettings()  # type: ignore
+```
+
+```mermaid
+sequenceDiagram
+    participant A as Your Application
+    participant B as BaseSettings
+    participant V as Vault
+    note over A,B: 1. Retrieve settings
+    A->>B: get_app_settings()
+    note over B: 2. Group secrets paths
+    B->>B: group_secrets_paths()
+    note over B,V: 3. Asynchronously fetch secrets by path from Vault
+    B->>V: get_secrets(secrets/data/<A>)
+    B->>V: get_secrets(secrets/data/<B>)
+    note over V,B: 4. Vault returns secrets
+    V->>B: return secrets for secrets/data/<A>
+    V->>B: return secrets for secrets/data/<B>
+    note over B: 5. Fill fields with secrets values
+    B->>B: SECRET_ONE => secrets/data/<A>[SECRET_ONE] <br> SECRET_TWO => secrets/data/<A>[SECRET_TWO] <br> SECRET_THREE => secrets/data/<B>[SECRET_THREE]
+    note over B,A: 6. Return settings
+    B->>A: settings with variables and secrets
 ```
 
 ## Table of Contents
