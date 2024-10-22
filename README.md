@@ -51,7 +51,7 @@ os.environ['VAULT_SECRET_ID'] = "<configure it>"
 # Only with Enterprise edition
 os.environ['VAULT_NAMESPACE'] = "<configure it>"
 
-# Usage
+### Usage
 app_settings_lock = Lock()
 
 @lru_cache
