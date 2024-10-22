@@ -60,6 +60,7 @@ def get_app_settings() -> AppSettings:
         return AppSettings()  # type: ignore
 ```
 
+### Internal interactions:
 ```mermaid
 sequenceDiagram
     participant A as Your Application
