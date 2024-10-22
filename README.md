@@ -68,8 +68,8 @@ sequenceDiagram
     participant V as Vault
     note over A,B: 1. Retrieve settings
     A->>B: get_app_settings()
-    note over B: 2. Group secrets paths
-    B->>B: group_secrets_paths()
+    note over B: 2. Collect secrets paths
+    B->>B: foreach fields, get the secret path and keep unique value
     note over B,V: 3. HTTPS Asynchronously fetch secrets by path from Vault
     B->>V: get_secrets(secrets/data/<A>)
     B->>V: get_secrets(secrets/data/<B>)
