@@ -54,7 +54,7 @@ dev-dependencies = [
 ]
 
 [tool.uv.sources]
-concurrency-pydantic2-settings-vault = { path = "pydantic2_settings_vault" }
+pydantic2-settings-vault = { path = "pydantic2_settings_vault" }
 # pydocks = { path = "../pydocks" }
 
 [tool.hatch.build.targets.wheel]
