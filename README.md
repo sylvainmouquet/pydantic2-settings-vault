@@ -42,7 +42,7 @@ class AppSettings(BaseSettings):
             VaultConfigSettingsSource(settings_cls=settings_cls),
         )
 
-# The connection to Vault is done via HTTP with AppRole authentication
+# The connection to Vault is done via HTTPS with AppRole authentication
 import os
 os.environ['VAULT_URL'] = "<configure it>"
 os.environ['VAULT_ROLE_ID'] = "<configure it>"
