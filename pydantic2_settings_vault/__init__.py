@@ -1,4 +1,4 @@
-__version__ = "0.0.1"
+__version__ = "1.0.1"
 __all__ = ("__version__", "VaultConfigSettingsSource")
 
 import asyncio
@@ -21,12 +21,16 @@ from aiohttp import ClientSession
 
 
 from reattempt import reattempt
+import certifi
+import ssl
 
 logger = logging.getLogger("pydantic2-settings-vault")
 logger.addHandler(logging.NullHandler())
 
 CONST_HEADER_X_VAULT_TOKEN: str = "X-Vault-Token"
 CONST_HEADER_X_VAULT_NAMESPACE: str = "X-Vault-Namespace"
+
+ssl_context = ssl.create_default_context(cafile=certifi.where())
 
 
 class InternalHttpVault:
@@ -42,7 +46,7 @@ class InternalHttpVault:
         self.secret_id = secret_id
 
     async def __aenter__(self):
-        connector = aiohttp.TCPConnector(limit=10)
+        connector = aiohttp.TCPConnector(limit=10, ssl=ssl_context)
         timeout = aiohttp.ClientTimeout(total=30)
         self.session = ClientSession(connector=connector, timeout=timeout)
 
@@ -125,7 +129,10 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
         vault_role_id: SecretStr = SecretStr(os.getenv("VAULT_ROLE_ID"))
         vault_secret_id: SecretStr = SecretStr(os.getenv("VAULT_SECRET_ID"))
 
-        if not vault_role_id.get_secret_value() or not vault_secret_id.get_secret_value():
+        if (
+            not vault_role_id.get_secret_value()
+            or not vault_secret_id.get_secret_value()
+        ):
             raise ValueError("VAULT_ROLE_ID and VAULT_SECRET_ID are mandatory")
 
         d: dict[str, Any] = {}
