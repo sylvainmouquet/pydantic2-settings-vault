@@ -83,7 +83,7 @@ class AppSettings(BaseSettings):
             init_settings,
             env_settings,
             dotenv_settings,
-            VaultConfigSettingsSource(settings_cls=settings_cls),
+            VaultConfigSettingsSource(settings_cls=settings_cls), #   add this line
         )
 
 # The connection to Vault is done via HTTPS with AppRole authentication
