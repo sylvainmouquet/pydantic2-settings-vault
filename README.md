@@ -1,3 +1,6 @@
+![license](https://img.shields.io/pypi/l/pydantic2-settings-vault?style=for-the-badge) ![python version](https://img.shields.io/pypi/pyversions/pydantic2-settings-vault?style=for-the-badge) [![version](https://img.shields.io/pypi/v/pydantic2-settings-vault?style=for-the-badge)](https://pypi.org/project/pydantic2-settings-vault/) [![](https://img.shields.io/pypi/dm/pydantic2-settings-vault?style=for-the-badge)](https://pypi.org/project/pydantic2-settings-vault/)
+
+
 # pydantic2-settings-vault
 
 Simple extension of [pydantic_settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) to collect secrets in [HashiCorp Vault](https://www.hashicorp.com/fr/products/vault) OpenSource (OSS) and Enterprise
