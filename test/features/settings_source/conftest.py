@@ -18,11 +18,14 @@ def configure_vault_env(vault_container, credentials_dict: dict[str, str]) -> No
     os.environ["VAULT_URL"] = f"http://{vault_container.host}:{vault_container.port}"
 
 
+VAULT_DEV_ROOT_TOKEN = "00000000-0000-0000-0000-000000000000"
+
+
 def configure_vault_token_env(
     vault_container, credentials_dict: dict[str, str]
 ) -> None:
     os.environ["VAULT_AUTH_METHOD"] = "token"
-    os.environ["VAULT_TOKEN"] = credentials_dict["ROOT_TOKEN"]
+    os.environ["VAULT_TOKEN"] = credentials_dict.get("ROOT_TOKEN", VAULT_DEV_ROOT_TOKEN)
     os.environ["VAULT_URL"] = f"http://{vault_container.host}:{vault_container.port}"
     os.environ.pop("VAULT_ROLE_ID", None)
     os.environ.pop("VAULT_SECRET_ID", None)

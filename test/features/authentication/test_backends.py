@@ -7,17 +7,25 @@ import pytest
 from pydantic import SecretStr
 
 from pydantic2_settings_vault.features.authentication.backends import (
+    AlicloudAuthBackend,
     AppRoleAuthBackend,
     AwsAuthBackend,
     AzureAuthBackend,
     CertAuthBackend,
+    CfAuthBackend,
     GcpAuthBackend,
+    GithubAuthBackend,
     JwtAuthBackend,
+    KerberosAuthBackend,
     KubernetesAuthBackend,
     LdapAuthBackend,
     OciAuthBackend,
     OidcAuthBackend,
+    OktaAuthBackend,
+    PcfAuthBackend,
+    RadiusAuthBackend,
     TokenAuthBackend,
+    UserpassAuthBackend,
 )
 from pydantic2_settings_vault.features.authentication.registry import (
     get_auth_backend_from_env,
@@ -285,6 +293,66 @@ async def test_internal_http_vault_login_failure():
         await vault.authenticate()
 
 
+@pytest.mark.asyncio
+async def test_internal_http_vault_get_secrets_kv_v2():
+    backend = TokenAuthBackend(token=SecretStr("root-token"))
+    vault = InternalHttpVault(
+        url="http://127.0.0.1:8200",
+        namespace=None,
+        auth_backend=backend,
+        default_kv_version=2,
+    )
+    vault.token = SecretStr("root-token")
+
+    response = AsyncMock()
+    response.status = 200
+    response.json = AsyncMock(
+        return_value={"data": {"data": {"FOO": "BAR"}, "metadata": {"version": 1}}}
+    )
+    response.__aenter__ = AsyncMock(return_value=response)
+    response.__aexit__ = AsyncMock(return_value=False)
+
+    vault.session = MagicMock()
+    vault.session.get = MagicMock(return_value=response)
+
+    secrets = await vault.get_secrets("secret/test", kv_version=2)
+
+    vault.session.get.assert_called_once_with(
+        "http://127.0.0.1:8200/v1/secret/data/test",
+        headers={"X-Vault-Token": "root-token"},
+    )
+    assert secrets["FOO"].get_secret_value() == "BAR"
+
+
+@pytest.mark.asyncio
+async def test_internal_http_vault_get_secrets_kv_v1():
+    backend = TokenAuthBackend(token=SecretStr("root-token"))
+    vault = InternalHttpVault(
+        url="http://127.0.0.1:8200",
+        namespace=None,
+        auth_backend=backend,
+        default_kv_version=1,
+    )
+    vault.token = SecretStr("root-token")
+
+    response = AsyncMock()
+    response.status = 200
+    response.json = AsyncMock(return_value={"data": {"FOO": "BAR"}})
+    response.__aenter__ = AsyncMock(return_value=response)
+    response.__aexit__ = AsyncMock(return_value=False)
+
+    vault.session = MagicMock()
+    vault.session.get = MagicMock(return_value=response)
+
+    secrets = await vault.get_secrets("secret/data/test", kv_version=1)
+
+    vault.session.get.assert_called_once_with(
+        "http://127.0.0.1:8200/v1/secret/test",
+        headers={"X-Vault-Token": "root-token"},
+    )
+    assert secrets["FOO"].get_secret_value() == "BAR"
+
+
 def test_jwt_auth_backend_builds_payload():
     backend = JwtAuthBackend(role="dev", jwt=SecretStr("signed-jwt"))
 
@@ -537,4 +605,325 @@ async def test_internal_http_vault_cert_login_uses_mtls(monkeypatch):
         headers={},
     )
     vault.session.post.assert_not_called()
+    assert vault.token.get_secret_value() == "vault-token"
+
+
+def test_userpass_auth_backend_builds_payload():
+    backend = UserpassAuthBackend(
+        username="alice",
+        password=SecretStr("secret"),
+    )
+
+    assert backend.build_login_payload() == {"password": "secret"}
+    assert backend.login_path == "auth/userpass/login/alice"
+
+
+def test_github_auth_backend_builds_payload():
+    backend = GithubAuthBackend(token=SecretStr("ghp_token"))
+
+    assert backend.build_login_payload() == {"token": "ghp_token"}
+    assert backend.login_path == "auth/github/login"
+
+
+def test_okta_auth_backend_builds_payload():
+    backend = OktaAuthBackend(
+        username="fred",
+        password=SecretStr("Password!"),
+        totp="123456",
+        mfa_provider="OKTA",
+    )
+
+    assert backend.build_login_payload() == {
+        "password": "Password!",
+        "totp": "123456",
+        "provider": "OKTA",
+    }
+    assert backend.login_path == "auth/okta/login/fred"
+
+
+def test_kerberos_auth_backend_uses_negotiate_header():
+    backend = KerberosAuthBackend(spnego_token="YIIFSw...")
+
+    assert backend.build_login_payload() == {}
+    assert backend.login_headers == {"Authorization": "Negotiate YIIFSw..."}
+    assert backend.login_path == "auth/kerberos/login"
+
+
+def test_radius_auth_backend_builds_payload():
+    backend = RadiusAuthBackend(
+        username="vishal",
+        password=SecretStr("Password!"),
+    )
+
+    assert backend.build_login_payload() == {"password": "Password!"}
+    assert backend.login_path == "auth/radius/login/vishal"
+
+
+def test_alicloud_auth_backend_requires_pre_signed_payload(monkeypatch):
+    monkeypatch.delenv("VAULT_ALICLOUD_IDENTITY_REQUEST_URL", raising=False)
+    monkeypatch.delenv("VAULT_ALICLOUD_IDENTITY_REQUEST_HEADERS", raising=False)
+
+    with pytest.raises(ValueError, match="VAULT_ALICLOUD_IDENTITY_REQUEST_URL"):
+        AlicloudAuthBackend.resolve_login_payload("dev-role")
+
+
+def test_alicloud_auth_backend_uses_pre_signed_payload(monkeypatch):
+    monkeypatch.setenv("VAULT_ALICLOUD_IDENTITY_REQUEST_URL", "url")
+    monkeypatch.setenv("VAULT_ALICLOUD_IDENTITY_REQUEST_HEADERS", "headers")
+
+    payload = AlicloudAuthBackend.resolve_login_payload("dev-role")
+
+    assert payload == {
+        "role": "dev-role",
+        "identity_request_url": "url",
+        "identity_request_headers": "headers",
+    }
+
+
+def test_cf_auth_backend_reads_cert_from_file(tmp_path, monkeypatch):
+    cert_file = tmp_path / "instance.crt"
+    cert_file.write_text("cert-from-file", encoding="utf-8")
+    monkeypatch.setenv("CF_INSTANCE_CERT", str(cert_file))
+    monkeypatch.setenv("VAULT_CF_SIGNING_TIME", "2019-05-20T22:08:40Z")
+    monkeypatch.setenv("VAULT_CF_SIGNATURE", "v1:signature")
+
+    payload = CfAuthBackend.resolve_login_payload("test-role")
+
+    assert payload["cf_instance_cert"] == "cert-from-file"
+
+
+def test_cf_auth_backend_signs_with_instance_key(tmp_path, monkeypatch):
+    pytest.importorskip("cryptography")
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    key_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    cert_file = tmp_path / "instance.crt"
+    key_file = tmp_path / "instance.key"
+    cert_file.write_text("cert-body", encoding="utf-8")
+    key_file.write_bytes(key_pem)
+    monkeypatch.setenv("CF_INSTANCE_CERT", str(cert_file))
+    monkeypatch.setenv("CF_INSTANCE_KEY", str(key_file))
+
+    payload = CfAuthBackend.resolve_login_payload("test-role")
+
+    assert payload["role"] == "test-role"
+    assert payload["cf_instance_cert"] == "cert-body"
+    assert payload["signature"].startswith("v1:")
+
+
+def test_cf_auth_backend_uses_pre_signed_payload(monkeypatch):
+    monkeypatch.setenv("VAULT_CF_INSTANCE_CERT", "cert-body")
+    monkeypatch.setenv("VAULT_CF_SIGNING_TIME", "2019-05-20T22:08:40Z")
+    monkeypatch.setenv("VAULT_CF_SIGNATURE", "v1:signature")
+
+    payload = CfAuthBackend.resolve_login_payload("test-role")
+
+    assert payload == {
+        "role": "test-role",
+        "cf_instance_cert": "cert-body",
+        "signing_time": "2019-05-20T22:08:40Z",
+        "signature": "v1:signature",
+    }
+
+
+def test_cf_auth_backend_generates_signature(monkeypatch):
+    pytest.importorskip("cryptography")
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    private_key_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    cert_body = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"
+    signing_time = "2019-05-20T22:08:40Z"
+
+    payload = CfAuthBackend.generate_login_payload(
+        "test-role",
+        cert_body,
+        private_key_pem,
+        signing_time=signing_time,
+    )
+
+    assert payload["role"] == "test-role"
+    assert payload["cf_instance_cert"] == cert_body
+    assert payload["signing_time"] == signing_time
+    assert payload["signature"].startswith("v1:")
+
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import padding, utils
+
+    to_sign = f"{signing_time}{cert_body}test-role"
+    digest = hashes.Hash(hashes.SHA256())
+    digest.update(to_sign.encode())
+    hashed = digest.finalize()
+    signature_bytes = base64.b64decode(payload["signature"][3:])
+    public_key = private_key.public_key()
+    public_key.verify(
+        signature_bytes,
+        hashed,
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH,
+        ),
+        utils.Prehashed(hashes.SHA256()),
+    )
+
+
+def test_pcf_auth_backend_uses_pcf_mount():
+    backend = PcfAuthBackend(
+        role="test-role",
+        cf_instance_cert="cert-body",
+        signing_time="2019-05-20T22:08:40Z",
+        signature="v1:signature",
+    )
+
+    assert backend.login_path == "auth/pcf/login"
+    assert backend.build_login_payload()["role"] == "test-role"
+
+
+def test_get_required_env_vars_for_phase3_methods():
+    assert get_required_env_vars_for_method("userpass") == (
+        "VAULT_USERPASS_USERNAME",
+        "VAULT_USERPASS_PASSWORD",
+    )
+    assert get_required_env_vars_for_method("github") == ("VAULT_GITHUB_TOKEN",)
+    assert get_required_env_vars_for_method("okta") == (
+        "VAULT_OKTA_USERNAME",
+        "VAULT_OKTA_PASSWORD",
+    )
+    assert get_required_env_vars_for_method("kerberos") == ("VAULT_KERBEROS_TOKEN",)
+    assert get_required_env_vars_for_method("radius") == (
+        "VAULT_RADIUS_USERNAME",
+        "VAULT_RADIUS_PASSWORD",
+    )
+    assert get_required_env_vars_for_method("alicloud") == ("VAULT_ALICLOUD_ROLE",)
+    assert get_required_env_vars_for_method("cf") == ("VAULT_CF_ROLE",)
+    assert get_required_env_vars_for_method("pcf") == ("VAULT_CF_ROLE",)
+
+
+def test_get_auth_backend_from_env_userpass(monkeypatch):
+    monkeypatch.setenv("VAULT_AUTH_METHOD", "userpass")
+    monkeypatch.setenv("VAULT_USERPASS_USERNAME", "alice")
+    monkeypatch.setenv("VAULT_USERPASS_PASSWORD", "secret")
+
+    backend = get_auth_backend_from_env()
+
+    assert isinstance(backend, UserpassAuthBackend)
+    assert backend.login_path == "auth/userpass/login/alice"
+
+
+def test_get_auth_backend_from_env_github(monkeypatch):
+    monkeypatch.setenv("VAULT_AUTH_METHOD", "github")
+    monkeypatch.setenv("VAULT_GITHUB_TOKEN", "ghp_token")
+
+    backend = get_auth_backend_from_env()
+
+    assert isinstance(backend, GithubAuthBackend)
+
+
+def test_get_auth_backend_from_env_okta(monkeypatch):
+    monkeypatch.setenv("VAULT_AUTH_METHOD", "okta")
+    monkeypatch.setenv("VAULT_OKTA_USERNAME", "fred")
+    monkeypatch.setenv("VAULT_OKTA_PASSWORD", "Password!")
+    monkeypatch.setenv("VAULT_OKTA_TOTP", "123456")
+
+    backend = get_auth_backend_from_env()
+
+    assert isinstance(backend, OktaAuthBackend)
+    assert backend.build_login_payload()["totp"] == "123456"
+
+
+def test_get_auth_backend_from_env_radius(monkeypatch):
+    monkeypatch.setenv("VAULT_AUTH_METHOD", "radius")
+    monkeypatch.setenv("VAULT_RADIUS_USERNAME", "vishal")
+    monkeypatch.setenv("VAULT_RADIUS_PASSWORD", "Password!")
+
+    backend = get_auth_backend_from_env()
+
+    assert isinstance(backend, RadiusAuthBackend)
+    assert backend.login_path == "auth/radius/login/vishal"
+
+
+def test_get_auth_backend_from_env_kerberos(monkeypatch):
+    monkeypatch.setenv("VAULT_AUTH_METHOD", "kerberos")
+    monkeypatch.setenv("VAULT_KERBEROS_TOKEN", "spnego-token")
+
+    backend = get_auth_backend_from_env()
+
+    assert isinstance(backend, KerberosAuthBackend)
+    assert backend.login_headers["Authorization"] == "Negotiate spnego-token"
+
+
+def test_get_auth_backend_from_env_alicloud(monkeypatch):
+    monkeypatch.setenv("VAULT_AUTH_METHOD", "alicloud")
+    monkeypatch.setenv("VAULT_ALICLOUD_ROLE", "dev-role")
+    monkeypatch.setenv("VAULT_ALICLOUD_IDENTITY_REQUEST_URL", "url")
+    monkeypatch.setenv("VAULT_ALICLOUD_IDENTITY_REQUEST_HEADERS", "headers")
+
+    backend = get_auth_backend_from_env()
+
+    assert isinstance(backend, AlicloudAuthBackend)
+    assert backend.build_login_payload()["identity_request_url"] == "url"
+
+
+def test_get_auth_backend_from_env_cf(monkeypatch):
+    monkeypatch.setenv("VAULT_AUTH_METHOD", "cf")
+    monkeypatch.setenv("VAULT_CF_ROLE", "test-role")
+    monkeypatch.setenv("VAULT_CF_INSTANCE_CERT", "cert-body")
+    monkeypatch.setenv("VAULT_CF_SIGNING_TIME", "2019-05-20T22:08:40Z")
+    monkeypatch.setenv("VAULT_CF_SIGNATURE", "v1:signature")
+
+    backend = get_auth_backend_from_env()
+
+    assert isinstance(backend, CfAuthBackend)
+    assert backend.signature == "v1:signature"
+
+
+def test_get_auth_backend_from_env_pcf(monkeypatch):
+    monkeypatch.setenv("VAULT_AUTH_METHOD", "pcf")
+    monkeypatch.setenv("VAULT_CF_ROLE", "test-role")
+    monkeypatch.setenv("VAULT_CF_INSTANCE_CERT", "cert-body")
+    monkeypatch.setenv("VAULT_CF_SIGNING_TIME", "2019-05-20T22:08:40Z")
+    monkeypatch.setenv("VAULT_CF_SIGNATURE", "v1:signature")
+
+    backend = get_auth_backend_from_env()
+
+    assert isinstance(backend, PcfAuthBackend)
+    assert backend.login_path == "auth/pcf/login"
+
+
+@pytest.mark.asyncio
+async def test_internal_http_vault_kerberos_login():
+    backend = KerberosAuthBackend(spnego_token="spnego-token")
+    vault = InternalHttpVault(
+        url="http://127.0.0.1:8200",
+        namespace=None,
+        auth_backend=backend,
+    )
+
+    response = AsyncMock()
+    response.status = 200
+    response.json = AsyncMock(return_value={"auth": {"client_token": "vault-token"}})
+    response.__aenter__ = AsyncMock(return_value=response)
+    response.__aexit__ = AsyncMock(return_value=False)
+
+    vault.session = MagicMock()
+    vault.session.post = MagicMock(return_value=response)
+
+    await vault.authenticate()
+
+    vault.session.post.assert_called_once_with(
+        "http://127.0.0.1:8200/v1/auth/kerberos/login",
+        json={},
+        headers={"Authorization": "Negotiate spnego-token"},
+    )
     assert vault.token.get_secret_value() == "vault-token"

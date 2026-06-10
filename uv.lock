@@ -2071,6 +2071,9 @@ aws = [
 azure = [
     { name = "azure-identity" },
 ]
+cf = [
+    { name = "cryptography" },
+]
 cloud = [
     { name = "azure-identity" },
     { name = "botocore" },
@@ -2112,6 +2115,7 @@ requires-dist = [
     { name = "botocore", marker = "extra == 'cloud'", specifier = ">=1.35.0" },
     { name = "certifi", specifier = ">=2025.1.31" },
     { name = "concurrency-limiter", specifier = ">=1.1.0" },
+    { name = "cryptography", marker = "extra == 'cf'", specifier = ">=43.0.0" },
     { name = "google-auth", marker = "extra == 'cloud'", specifier = ">=2.35.0" },
     { name = "google-auth", marker = "extra == 'gcp'", specifier = ">=2.35.0" },
     { name = "oci", marker = "extra == 'cloud'", specifier = ">=2.135.0" },
@@ -2122,7 +2126,7 @@ requires-dist = [
     { name = "requests", marker = "extra == 'cloud'", specifier = ">=2.32.0" },
     { name = "requests", marker = "extra == 'oci'", specifier = ">=2.32.0" },
 ]
-provides-extras = ["aws", "gcp", "azure", "oci", "cloud"]
+provides-extras = ["aws", "gcp", "azure", "oci", "cf", "cloud"]
 
 [package.metadata.requires-dev]
 dev = [

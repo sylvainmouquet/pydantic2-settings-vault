@@ -53,6 +53,11 @@ class VaultAuthBackend(ABC):
     def build_login_payload(self) -> dict[str, Any]:
         """Build the JSON body for the auth login request."""
 
+    @property
+    def login_headers(self) -> dict[str, str]:
+        """Return extra headers for the auth login request."""
+        return {}
+
     @classmethod
     def display_name(cls) -> str:
         return cls.method_name
@@ -393,9 +398,7 @@ class OidcAuthBackend(VaultAuthBackend):
             return SecretStr(jwt_value)
         if jwt_value := os.getenv("VAULT_OIDC_ID_TOKEN"):
             return SecretStr(jwt_value)
-        raise ValueError(
-            "OIDC auth requires VAULT_OIDC_JWT or VAULT_OIDC_ID_TOKEN."
-        )
+        raise ValueError("OIDC auth requires VAULT_OIDC_JWT or VAULT_OIDC_ID_TOKEN.")
 
     def build_login_payload(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -575,3 +578,316 @@ class OciAuthBackend(VaultAuthBackend):
 
     def build_login_payload(self) -> dict[str, Any]:
         return {"request_headers": self.request_headers}
+
+
+class UserpassAuthBackend(VaultAuthBackend):
+    method_name = "userpass"
+    default_mount = "userpass"
+
+    def __init__(
+        self,
+        username: str,
+        password: SecretStr,
+        mount: str | None = None,
+    ) -> None:
+        super().__init__(mount=mount)
+        self.username = username
+        self.password = password
+
+    @classmethod
+    def required_env_vars(cls) -> tuple[str, ...]:
+        return ("VAULT_USERPASS_USERNAME", "VAULT_USERPASS_PASSWORD")
+
+    @property
+    def login_path(self) -> str:
+        return f"auth/{self.mount}/login/{self.username}"
+
+    def build_login_payload(self) -> dict[str, Any]:
+        return {"password": self.password.get_secret_value()}
+
+
+class GithubAuthBackend(VaultAuthBackend):
+    method_name = "github"
+    default_mount = "github"
+
+    def __init__(
+        self,
+        token: SecretStr,
+        mount: str | None = None,
+    ) -> None:
+        super().__init__(mount=mount)
+        self.token = token
+
+    @classmethod
+    def required_env_vars(cls) -> tuple[str, ...]:
+        return ("VAULT_GITHUB_TOKEN",)
+
+    def build_login_payload(self) -> dict[str, Any]:
+        return {"token": self.token.get_secret_value()}
+
+
+class OktaAuthBackend(VaultAuthBackend):
+    method_name = "okta"
+    default_mount = "okta"
+
+    def __init__(
+        self,
+        username: str,
+        password: SecretStr,
+        mount: str | None = None,
+        *,
+        totp: str | None = None,
+        mfa_provider: str | None = None,
+    ) -> None:
+        super().__init__(mount=mount)
+        self.username = username
+        self.password = password
+        self.totp = totp
+        self.mfa_provider = mfa_provider
+
+    @classmethod
+    def required_env_vars(cls) -> tuple[str, ...]:
+        return ("VAULT_OKTA_USERNAME", "VAULT_OKTA_PASSWORD")
+
+    @property
+    def login_path(self) -> str:
+        return f"auth/{self.mount}/login/{self.username}"
+
+    def build_login_payload(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"password": self.password.get_secret_value()}
+        if self.totp is not None:
+            payload["totp"] = self.totp
+        if self.mfa_provider is not None:
+            payload["provider"] = self.mfa_provider
+        return payload
+
+
+class KerberosAuthBackend(VaultAuthBackend):
+    method_name = "kerberos"
+    default_mount = "kerberos"
+
+    def __init__(
+        self,
+        spnego_token: str,
+        mount: str | None = None,
+    ) -> None:
+        super().__init__(mount=mount)
+        self.spnego_token = spnego_token
+
+    @classmethod
+    def required_env_vars(cls) -> tuple[str, ...]:
+        return ("VAULT_KERBEROS_TOKEN",)
+
+    @property
+    def login_headers(self) -> dict[str, str]:
+        return {"Authorization": f"Negotiate {self.spnego_token}"}
+
+    def build_login_payload(self) -> dict[str, Any]:
+        return {}
+
+
+class RadiusAuthBackend(VaultAuthBackend):
+    method_name = "radius"
+    default_mount = "radius"
+
+    def __init__(
+        self,
+        username: str,
+        password: SecretStr,
+        mount: str | None = None,
+    ) -> None:
+        super().__init__(mount=mount)
+        self.username = username
+        self.password = password
+
+    @classmethod
+    def required_env_vars(cls) -> tuple[str, ...]:
+        return ("VAULT_RADIUS_USERNAME", "VAULT_RADIUS_PASSWORD")
+
+    @property
+    def login_path(self) -> str:
+        return f"auth/{self.mount}/login/{self.username}"
+
+    def build_login_payload(self) -> dict[str, Any]:
+        return {"password": self.password.get_secret_value()}
+
+
+class AlicloudAuthBackend(VaultAuthBackend):
+    method_name = "alicloud"
+    default_mount = "alicloud"
+
+    def __init__(
+        self,
+        role: str,
+        mount: str | None = None,
+        *,
+        login_payload: dict[str, str] | None = None,
+    ) -> None:
+        super().__init__(mount=mount)
+        self.role = role
+        self._login_payload = login_payload
+
+    @classmethod
+    def required_env_vars(cls) -> tuple[str, ...]:
+        return ("VAULT_ALICLOUD_ROLE",)
+
+    @classmethod
+    def resolve_login_payload(cls, role: str) -> dict[str, str]:
+        request_url = os.getenv("VAULT_ALICLOUD_IDENTITY_REQUEST_URL")
+        request_headers = os.getenv("VAULT_ALICLOUD_IDENTITY_REQUEST_HEADERS")
+
+        if request_url and request_headers:
+            return {
+                "role": role,
+                "identity_request_url": request_url,
+                "identity_request_headers": request_headers,
+            }
+
+        raise ValueError(
+            "Alicloud auth requires VAULT_ALICLOUD_IDENTITY_REQUEST_URL and "
+            "VAULT_ALICLOUD_IDENTITY_REQUEST_HEADERS with a pre-signed STS "
+            "GetCallerIdentity request."
+        )
+
+    def build_login_payload(self) -> dict[str, Any]:
+        if self._login_payload is not None:
+            return self._login_payload
+        return self.resolve_login_payload(self.role)
+
+
+class CfAuthBackend(VaultAuthBackend):
+    method_name = "cf"
+    default_mount = "cf"
+    _signing_time_format = "%Y-%m-%dT%H:%M:%SZ"
+
+    def __init__(
+        self,
+        role: str,
+        cf_instance_cert: str,
+        signing_time: str,
+        signature: str,
+        mount: str | None = None,
+    ) -> None:
+        super().__init__(mount=mount)
+        self.role = role
+        self.cf_instance_cert = cf_instance_cert
+        self.signing_time = signing_time
+        self.signature = signature
+
+    @classmethod
+    def required_env_vars(cls) -> tuple[str, ...]:
+        return ("VAULT_CF_ROLE",)
+
+    @classmethod
+    def resolve_instance_cert(cls) -> str:
+        if cert_value := os.getenv("VAULT_CF_INSTANCE_CERT"):
+            return cert_value
+
+        cert_path = os.getenv("CF_INSTANCE_CERT")
+        if not cert_path:
+            raise ValueError(
+                "CF auth requires VAULT_CF_INSTANCE_CERT or CF_INSTANCE_CERT "
+                "pointing to the instance identity certificate file."
+            )
+
+        cert_file = Path(cert_path)
+        if not cert_file.is_file():
+            raise ValueError(
+                f"CF instance certificate file {cert_path!r} is not readable."
+            )
+
+        return cert_file.read_text(encoding="utf-8")
+
+    @classmethod
+    def resolve_login_payload(cls, role: str) -> dict[str, str]:
+        signing_time = os.getenv("VAULT_CF_SIGNING_TIME")
+        signature = os.getenv("VAULT_CF_SIGNATURE")
+        cf_instance_cert = cls.resolve_instance_cert()
+
+        if signing_time and signature:
+            return {
+                "role": role,
+                "cf_instance_cert": cf_instance_cert,
+                "signing_time": signing_time,
+                "signature": signature,
+            }
+
+        key_path = os.getenv("CF_INSTANCE_KEY")
+        if not key_path:
+            raise ValueError(
+                "CF auth requires VAULT_CF_SIGNING_TIME and VAULT_CF_SIGNATURE, "
+                "or CF_INSTANCE_KEY to sign the login request."
+            )
+
+        key_file = Path(key_path)
+        if not key_file.is_file():
+            raise ValueError(f"CF instance key file {key_path!r} is not readable.")
+
+        return cls.generate_login_payload(
+            role,
+            cf_instance_cert,
+            key_file.read_bytes(),
+        )
+
+    @classmethod
+    def generate_login_payload(
+        cls,
+        role: str,
+        cf_instance_cert: str,
+        private_key_pem: bytes,
+        *,
+        signing_time: str | None = None,
+    ) -> dict[str, str]:
+        try:
+            from cryptography.hazmat.primitives import hashes, serialization
+            from cryptography.hazmat.primitives.asymmetric import padding, utils
+        except ImportError as exc:
+            raise ImportError(
+                "CF auth requires cryptography to sign login requests. Install with "
+                "'pip install pydantic2-settings-vault[cf]' or set "
+                "VAULT_CF_SIGNING_TIME and VAULT_CF_SIGNATURE."
+            ) from exc
+
+        from datetime import datetime, timezone
+
+        resolved_signing_time = signing_time or datetime.now(timezone.utc).strftime(
+            cls._signing_time_format
+        )
+        to_sign = f"{resolved_signing_time}{cf_instance_cert}{role}"
+        digest = hashes.Hash(hashes.SHA256())
+        digest.update(to_sign.encode())
+        hashed = digest.finalize()
+
+        private_key = serialization.load_pem_private_key(
+            private_key_pem,
+            password=None,
+        )
+        signature_bytes = private_key.sign(
+            hashed,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH,
+            ),
+            utils.Prehashed(hashes.SHA256()),
+        )
+        signature = f"v1:{base64.b64encode(signature_bytes).decode()}"
+
+        return {
+            "role": role,
+            "cf_instance_cert": cf_instance_cert,
+            "signing_time": resolved_signing_time,
+            "signature": signature,
+        }
+
+    def build_login_payload(self) -> dict[str, Any]:
+        return {
+            "role": self.role,
+            "cf_instance_cert": self.cf_instance_cert,
+            "signing_time": self.signing_time,
+            "signature": self.signature,
+        }
+
+
+class PcfAuthBackend(CfAuthBackend):
+    method_name = "pcf"
+    default_mount = "pcf"

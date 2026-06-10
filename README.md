@@ -66,11 +66,13 @@ ex:
 MY_SECRET: SecretStr = Field(
         ...,
         json_schema_extra={
-            "vault_secret_path": "secret/data/test",
+            "vault_secret_path": "secret/test",
             "vault_secret_key": "FOO",  # pragma: allowlist secret
         },
     )
 ```
+
+For KV v2 (default), use the logical path `mount/secret-name`. The library adds the `/data/` segment for Vault HTTP reads. You can also pass the full API path `secret/data/test`. See [docs/vault-kv-and-policies.md](docs/vault-kv-and-policies.md) for KV v1, policies, and field-mapping patterns.
 
 #### Full example
 ```python
@@ -89,7 +91,7 @@ class AppSettings(BaseSettings):
     MY_SECRET: SecretStr = Field(
         ...,
         json_schema_extra={
-            "vault_secret_path": "secret/data/test",
+            "vault_secret_path": "secret/test",
             "vault_secret_key": "FOO",  # pragma: allowlist secret
         },
     )
@@ -137,12 +139,21 @@ Select the auth backend with `VAULT_AUTH_METHOD` (default: `approle`). Override 
 | Cert | `cert` | `VAULT_CLIENT_CERT`, `VAULT_CLIENT_KEY`, optional `VAULT_CERT_NAME` |
 | LDAP | `ldap` | `VAULT_LDAP_USERNAME`, `VAULT_LDAP_PASSWORD` |
 | OCI | `oci` | `VAULT_OCI_ROLE`, plus signed request headers or `oci` SDK credentials |
+| Userpass | `userpass` | `VAULT_USERPASS_USERNAME`, `VAULT_USERPASS_PASSWORD` |
+| GitHub | `github` | `VAULT_GITHUB_TOKEN` |
+| Okta | `okta` | `VAULT_OKTA_USERNAME`, `VAULT_OKTA_PASSWORD`, optional `VAULT_OKTA_TOTP` |
+| Kerberos | `kerberos` | `VAULT_KERBEROS_TOKEN` (base64 SPNEGO token) |
+| RADIUS | `radius` | `VAULT_RADIUS_USERNAME`, `VAULT_RADIUS_PASSWORD` |
+| Alicloud | `alicloud` | `VAULT_ALICLOUD_ROLE`, plus pre-signed STS request env vars |
+| CF | `cf` | `VAULT_CF_ROLE`, plus instance cert/key or pre-signed login fields |
+| PCF | `pcf` | Same as CF (`VAULT_CF_ROLE`, instance cert/key or pre-signed fields) |
 
 Common variables for every method:
 
 - `VAULT_URL` — Vault API address (default: `http://127.0.0.1:8200`)
 - `VAULT_NAMESPACE` — optional Enterprise namespace
-- `VAULT_AUTH_MOUNT` — optional auth mount override (defaults: `approle`, `token`, `kubernetes`, `aws`, `gcp`, `azure`, `jwt`, `oidc`, `cert`, `ldap`, `oci`)
+- `VAULT_KV_VERSION` — KV engine version (`1` or `2`, default `2`)
+- `VAULT_AUTH_MOUNT` — optional auth mount override (defaults match each method name above)
 
 **Token auth** uses a pre-issued token directly; no login call is made.
 
@@ -163,6 +174,22 @@ Common variables for every method:
 **LDAP auth** binds with username and password (`POST /v1/auth/ldap/login/<username>`).
 
 **OCI auth** signs a GET request to the OCI login endpoint. Provide pre-signed headers via `VAULT_OCI_REQUEST_HEADERS`, or install `oci` (`pip install pydantic2-settings-vault[oci]`) and use instance principal (`VAULT_OCI_AUTH_TYPE=instance`, default) or API key (`VAULT_OCI_AUTH_TYPE=api_key` with standard OCI config).
+
+**Userpass auth** binds with username and password (`POST /v1/auth/userpass/login/<username>`).
+
+**GitHub auth** sends a personal access token (`POST /v1/auth/github/login`).
+
+**Okta auth** binds with username and password against Okta (`POST /v1/auth/okta/login/<username>`). Set optional `VAULT_OKTA_TOTP` and `VAULT_OKTA_MFA_PROVIDER` when MFA is required.
+
+**Kerberos auth** sends a pre-generated SPNEGO token in the `Authorization: Negotiate` header (`POST /v1/auth/kerberos/login`). Set `VAULT_KERBEROS_TOKEN` to the base64 token value (without the `Negotiate` prefix).
+
+**RADIUS auth** binds with username and password (`POST /v1/auth/radius/login/<username>`).
+
+**Alicloud auth** verifies a signed STS `GetCallerIdentity` request. Provide `VAULT_ALICLOUD_IDENTITY_REQUEST_URL` and `VAULT_ALICLOUD_IDENTITY_REQUEST_HEADERS` (base64-encoded values from `vault login -method=alicloud` or your own signer).
+
+**CF auth** signs the instance identity certificate with `CF_INSTANCE_KEY` (`POST /v1/auth/cf/login`). On a CF instance, set `VAULT_CF_ROLE` and rely on `CF_INSTANCE_CERT` / `CF_INSTANCE_KEY`, or provide `VAULT_CF_SIGNING_TIME` and `VAULT_CF_SIGNATURE`. Install `cryptography` (`pip install pydantic2-settings-vault[cf]`) to generate signatures locally.
+
+**PCF auth** uses the same login payload as CF against the legacy `pcf` mount (`POST /v1/auth/pcf/login`).
 
 Example token auth:
 

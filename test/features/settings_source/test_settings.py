@@ -1,19 +1,43 @@
 import logging
+import os
 
 from loguru import logger
 import pytest
+from pydantic import Field, SecretStr
 from pydantic_core._pydantic_core import ValidationError
 
 from test.features.settings_source.conftest import (
     configure_vault_env,
     configure_vault_token_env,
     parse_vault_credentials,
+    VAULT_DEV_ROOT_TOKEN,
 )
 from test.features.settings_source.settings import (
+    AppSettings,
     ValidAppSettings,
     get_invalid_app_settings,
     get_valid_app_settings,
 )
+
+
+class LogicalPathAppSettings(AppSettings):
+    FOO: SecretStr = Field(
+        ...,
+        json_schema_extra={
+            "vault_secret_path": "secret/test",
+            "vault_secret_key": "FOO",
+        },
+    )
+
+
+class Kv1AppSettings(AppSettings):
+    FOO: SecretStr = Field(
+        ...,
+        json_schema_extra={
+            "vault_secret_path": "secretv1/test",
+            "vault_secret_key": "FOO",
+        },
+    )
 
 
 def test_missing_vault_credentials_error_mentions_required_env_vars(monkeypatch):
@@ -79,5 +103,44 @@ async def test_valid_get_secret_with_token_auth(
         ["vault", "kv", "put", "-mount=secret", "test", "FOO=BAR"],
     )
 
+    get_valid_app_settings.cache_clear()
     settings: ValidAppSettings = get_valid_app_settings()
+    assert settings.FOO.get_secret_value() == "BAR"
+
+
+@pytest.mark.asyncio
+async def test_valid_get_secret_with_logical_kv2_path(
+    disable_logging_exception, vault_container
+):
+    credentials = vault_container.execute(["cat", "/vault-credentials.env"])
+    credentials_dict = parse_vault_credentials(credentials)
+    configure_vault_env(vault_container, credentials_dict)
+    os.environ.pop("VAULT_KV_VERSION", None)
+
+    vault_container.execute(
+        ["vault", "kv", "put", "-mount=secret", "test", "FOO=BAR"],
+    )
+
+    settings = LogicalPathAppSettings()  # type: ignore
+    assert settings.FOO.get_secret_value() == "BAR"
+
+
+@pytest.mark.asyncio
+async def test_valid_get_secret_with_kv_v1_mount(
+    disable_logging_exception, vault_container
+):
+    credentials = vault_container.execute(["cat", "/vault-credentials.env"])
+    credentials_dict = parse_vault_credentials(credentials)
+    configure_vault_token_env(vault_container, credentials_dict)
+    os.environ["VAULT_KV_VERSION"] = "1"
+    os.environ["VAULT_TOKEN"] = VAULT_DEV_ROOT_TOKEN
+
+    vault_container.execute(
+        ["vault", "secrets", "enable", "-path=secretv1", "-version=1", "kv"],
+    )
+    vault_container.execute(
+        ["vault", "kv", "put", "-mount=secretv1", "test", "FOO=BAR"],
+    )
+
+    settings = Kv1AppSettings()  # type: ignore
     assert settings.FOO.get_secret_value() == "BAR"

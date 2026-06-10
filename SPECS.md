@@ -82,7 +82,7 @@ Acts as a drop-in settings source for Pydantic v2. Users just add the source, an
 
 ### 6. Support all HashiCorp Vault auth methods
 
-**Status:** Planned
+**Status:** Done
 
 Extend authentication beyond AppRole so applications can use any [built-in Vault auth method](https://developer.hashicorp.com/vault/docs/auth) appropriate to their runtime. Introduce a pluggable auth backend selected via configuration (for example `VAULT_AUTH_METHOD` and method-specific environment variables), with support for custom mount paths (`auth/<mount>`).
 
@@ -104,14 +104,14 @@ Extend authentication beyond AppRole so applications can use any [built-in Vault
 
 **Phase 3 — human and legacy integrations**
 
-- [ ] **Userpass** — username and password login
-- [ ] **GitHub** — GitHub personal access token login
-- [ ] **Okta** — Okta API token login
-- [ ] **Kerberos** — SPNEGO/GSSAPI login
-- [ ] **RADIUS** — RADIUS username and password login
-- [ ] **Alicloud** — Alibaba Cloud RAM credential login
-- [ ] **CF** — Cloud Foundry instance credential login
-- [ ] **PCF** — legacy PCF instance credential login (if still required by deployments)
+- [x] **Userpass** — username and password login
+- [x] **GitHub** — GitHub personal access token login
+- [x] **Okta** — Okta username and password login
+- [x] **Kerberos** — SPNEGO/GSSAPI login
+- [x] **RADIUS** — RADIUS username and password login
+- [x] **Alicloud** — Alibaba Cloud RAM credential login
+- [x] **CF** — Cloud Foundry instance credential login
+- [x] **PCF** — legacy PCF instance credential login (if still required by deployments)
 
 **Cross-cutting requirements**
 
@@ -127,15 +127,15 @@ Extend authentication beyond AppRole so applications can use any [built-in Vault
 
 ### 7. Improve testing and mocking
 
-**Status:** Planned
+**Status:** Done
 
 Add comprehensive automated tests that cover Vault API responses, field mapping, authentication, and failure modes.
 
-- [ ] Add tests for Vault HTTP authentication and secret fetch logic
-- [ ] Mock Vault API responses for success and error scenarios
-- [ ] Cover missing key, network failure, and authentication failure behavior
+- [x] Add tests for Vault HTTP authentication and secret fetch logic
+- [x] Mock Vault API responses for success and error scenarios
+- [x] Cover missing key, network failure, and authentication failure behavior
 
-**Potential files:** `tests/`, `pyproject.toml`
+**Key files:** `test/features/shared/vault_mocks.py`, `test/features/shared/test_vault_http.py`, `test/features/settings_source/test_source.py`, `test/features/authentication/test_backends.py`
 
 ### 8. Usage documentation
 
@@ -210,14 +210,14 @@ Provide a lightweight way to validate Vault connectivity, authentication, and fi
 
 ### 13. Advanced HashiCorp Vault support
 
-**Status:** Planned
+**Status:** Done
 
 Deepen HashiCorp Vault integration so the library covers more real-world deployment patterns without adding other secret backends. Authentication method coverage is tracked in feature 6.
 
-- [ ] Support KV engine version selection and path conventions
-- [ ] Document recommended Vault policies and field-mapping patterns
+- [x] Support KV engine version selection and path conventions
+- [x] Document recommended Vault policies and field-mapping patterns
 
-**Potential files:** `pydantic2_settings_vault/shared/infrastructure/vault_http.py`, `pydantic2_settings_vault/features/settings_source/source.py`, `tests/`, `README.md`
+**Key files:** `pydantic2_settings_vault/shared/infrastructure/kv_paths.py`, `pydantic2_settings_vault/shared/infrastructure/vault_http.py`, `pydantic2_settings_vault/features/settings_source/source.py`, `pydantic2_settings_vault/features/settings_source/validation.py`, `test/features/shared/test_kv_paths.py`, `test/features/settings_source/test_settings.py`, `docs/vault-kv-and-policies.md`, `README.md`
 
 ### 14. Vault token lifecycle management
 
@@ -274,4 +274,4 @@ Support [HashiCorp Vault Enterprise](https://www.hashicorp.com/products/vault) d
 - Async supported via event loop management, sync fallback via thread executor
 - All critical HTTP logic and field mapping reside in core `__init__.py`
 - All fields are always type checked and validated using Pydantic's mechanisms
-- **Planned auth architecture:** one `VaultAuthBackend` implementation per built-in Vault auth method under `features/authentication/`; `InternalHttpVault` delegates login to the selected backend and reuses the returned client token for secret fetches. Phase 1 backends (token, kubernetes, aws, gcp, azure) are implemented; AppRole remains the default for backward compatibility.
+- **Auth architecture:** one `VaultAuthBackend` implementation per built-in Vault auth method under `features/authentication/`; `InternalHttpVault` delegates login to the selected backend and reuses the returned client token for secret fetches. All phased backends (token, kubernetes, aws, gcp, azure, jwt, oidc, cert, ldap, oci, userpass, github, okta, kerberos, radius, alicloud, cf, pcf) are implemented; AppRole remains the default for backward compatibility.

@@ -33,6 +33,28 @@ class NonVaultSettings(BaseSettings):
     PLAIN: str = "value"
 
 
+class InvalidKvVersionSettings(AppSettings):
+    FOO: SecretStr = Field(
+        ...,
+        json_schema_extra={
+            "vault_secret_path": "secret/data/test",
+            "vault_secret_key": "FOO",
+            "vault_kv_version": 3,
+        },
+    )
+
+
+class InvalidKvVersionTypeSettings(AppSettings):
+    FOO: SecretStr = Field(
+        ...,
+        json_schema_extra={
+            "vault_secret_path": "secret/data/test",
+            "vault_secret_key": "FOO",
+            "vault_kv_version": "bad",
+        },
+    )
+
+
 def test_validate_reports_missing_env_vars(monkeypatch):
     monkeypatch.delenv("VAULT_ROLE_ID", raising=False)
     monkeypatch.delenv("VAULT_SECRET_ID", raising=False)
@@ -69,6 +91,40 @@ def test_validate_reports_missing_path_metadata(monkeypatch):
     assert result.errors[0].code == "incomplete_field_metadata"
     assert result.errors[0].field_name == "BAR"
     assert "vault_secret_path" in result.errors[0].message
+
+
+def test_validate_reports_invalid_kv_version_env(monkeypatch):
+    monkeypatch.setenv("VAULT_KV_VERSION", "9")
+    monkeypatch.setenv("VAULT_ROLE_ID", "role-id")
+    monkeypatch.setenv("VAULT_SECRET_ID", "secret-id")
+
+    result = validate_vault_configuration(ValidAppSettings)
+
+    assert not result.valid
+    assert any(error.code == "invalid_kv_version" for error in result.errors)
+
+
+def test_validate_reports_invalid_field_kv_version(monkeypatch):
+    monkeypatch.setenv("VAULT_ROLE_ID", "role-id")
+    monkeypatch.setenv("VAULT_SECRET_ID", "secret-id")
+
+    result = validate_vault_configuration(InvalidKvVersionSettings)
+
+    assert not result.valid
+    assert result.errors[0].code == "invalid_kv_version"
+    assert result.errors[0].field_name == "FOO"
+
+
+def test_validate_reports_invalid_field_kv_version_type(monkeypatch):
+    monkeypatch.setenv("VAULT_ROLE_ID", "role-id")
+    monkeypatch.setenv("VAULT_SECRET_ID", "secret-id")
+
+    result = validate_vault_configuration(InvalidKvVersionTypeSettings)
+
+    assert not result.valid
+    assert result.errors[0].code == "invalid_kv_version"
+    assert result.errors[0].field_name == "FOO"
+    assert "vault_kv_version" in result.errors[0].message
 
 
 def test_validate_succeeds_for_valid_configuration(monkeypatch):
@@ -123,7 +179,7 @@ async def test_validate_auth_check_reports_failure(
     assert not result.valid
     assert len(result.errors) == 1
     assert result.errors[0].code == "auth_failed"
-    assert "Vault authentication check failed" in result.errors[0].message
+    assert "authentication check failed" in result.errors[0].message
 
 
 def test_validate_skips_auth_check_when_env_vars_missing(monkeypatch):

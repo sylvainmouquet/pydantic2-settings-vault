@@ -15,6 +15,11 @@ from pydantic2_settings_vault.features.authentication.registry import (
     get_required_env_vars_for_method,
     resolve_auth_method,
 )
+from pydantic2_settings_vault.shared.infrastructure.kv_paths import (
+    normalize_kv_path,
+    resolve_kv_version,
+    resolve_kv_version_from_env,
+)
 from pydantic2_settings_vault.shared.infrastructure.vault_http import InternalHttpVault
 
 logger = logging.getLogger("pydantic2-settings-vault")
@@ -80,12 +85,13 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
         vault_url: str = os.getenv("VAULT_URL", default="http://127.0.0.1:8200")
         vault_namespace: str | None = os.getenv("VAULT_NAMESPACE")
         auth_backend = self._get_auth_backend()
+        default_kv_version = resolve_kv_version_from_env()
 
         d: dict[str, Any] = {}
 
-        async def _get_list_vault_paths() -> list[str]:
-            """get the list of vault path defined in pydantic settings"""
-            vault_path_list: list[str] = []
+        async def _get_vault_fetch_targets() -> list[tuple[str, int]]:
+            """Collect unique Vault paths to fetch, normalized per KV version."""
+            fetch_targets: dict[tuple[str, int], None] = {}
             for _fieldname, field in filter(
                 lambda item: item[1].json_schema_extra,
                 self.settings_cls.model_fields.items(),
@@ -93,16 +99,27 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
                 vault_path, _vault_secret_key = self._get_field_vault_metadata(
                     field_name=_fieldname, field=field
                 )
-                if vault_path not in vault_path_list:
-                    vault_path_list.append(vault_path)
+                field_metadata = field.json_schema_extra
+                metadata_dict = field_metadata if isinstance(field_metadata, dict) else {}
+                kv_version = resolve_kv_version(
+                    metadata_dict,
+                    default=default_kv_version,
+                )
+                normalized_path = normalize_kv_path(vault_path, kv_version)
+                fetch_targets[(normalized_path, kv_version)] = None
 
-            return vault_path_list
+            return list(fetch_targets.keys())
 
         @concurrency_limiter(max_concurrent=5)
         async def _get_vault_secrets(
-            _vault: InternalHttpVault, vault_path: str
+            _vault: InternalHttpVault,
+            vault_path: str,
+            kv_version: int,
         ) -> dict[str, SecretStr]:
-            return await _vault.get_secrets(vault_path=vault_path)
+            return await _vault.get_secrets(
+                vault_path=vault_path,
+                kv_version=kv_version,
+            )
 
         @reattempt
         async def get_secrets():
@@ -112,12 +129,17 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
                 url=vault_url,
                 namespace=vault_namespace,
                 auth_backend=auth_backend,
+                default_kv_version=default_kv_version,
             ) as vault:
-                vault_path_list: list[str] = await _get_list_vault_paths()
+                fetch_targets = await _get_vault_fetch_targets()
                 vault_secrets_list: list[dict[str, SecretStr]] = await asyncio.gather(
                     *[
-                        _get_vault_secrets(_vault=vault, vault_path=vault_path)
-                        for vault_path in vault_path_list
+                        _get_vault_secrets(
+                            _vault=vault,
+                            vault_path=vault_path,
+                            kv_version=kv_version,
+                        )
+                        for vault_path, kv_version in fetch_targets
                     ]
                 )
 

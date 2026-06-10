@@ -11,6 +11,11 @@ from pydantic2_settings_vault.features.authentication.registry import (
     get_required_env_vars_for_method,
     resolve_auth_method,
 )
+from pydantic2_settings_vault.shared.infrastructure.kv_paths import (
+    SUPPORTED_KV_VERSIONS,
+    VAULT_KV_VERSION_METADATA_KEY,
+    resolve_kv_version_from_env,
+)
 from pydantic2_settings_vault.shared.infrastructure.vault_http import InternalHttpVault
 
 VAULT_METADATA_KEYS: tuple[str, str] = ("vault_secret_path", "vault_secret_key")
@@ -107,6 +112,61 @@ def _collect_field_metadata_issues(
     return issues
 
 
+def _collect_kv_version_issues(
+    settings_cls: type[BaseSettings],
+) -> list[VaultValidationIssue]:
+    issues: list[VaultValidationIssue] = []
+
+    try:
+        resolve_kv_version_from_env()
+    except ValueError as exc:
+        issues.append(
+            VaultValidationIssue(
+                code="invalid_kv_version",
+                message=str(exc),
+            )
+        )
+
+    for field_name, field_metadata in _iter_vault_backed_fields(settings_cls):
+        raw_version = field_metadata.get(VAULT_KV_VERSION_METADATA_KEY)
+        if raw_version is None:
+            continue
+
+        try:
+            parsed_version = int(raw_version)
+        except (TypeError, ValueError):
+            issues.append(
+                VaultValidationIssue(
+                    code="invalid_kv_version",
+                    message=(
+                        f"Vault metadata for settings field '{field_name}' has invalid "
+                        f"{VAULT_KV_VERSION_METADATA_KEY} value {raw_version!r}. "
+                        "Expected 1 or 2."
+                    ),
+                    field_name=field_name,
+                )
+            )
+            continue
+
+        if parsed_version not in SUPPORTED_KV_VERSIONS:
+            supported_versions = ", ".join(
+                str(version) for version in sorted(SUPPORTED_KV_VERSIONS)
+            )
+            issues.append(
+                VaultValidationIssue(
+                    code="invalid_kv_version",
+                    message=(
+                        f"Vault metadata for settings field '{field_name}' has unsupported "
+                        f"{VAULT_KV_VERSION_METADATA_KEY} value {parsed_version!r}. "
+                        f"Supported versions: {supported_versions}."
+                    ),
+                    field_name=field_name,
+                )
+            )
+
+    return issues
+
+
 def _run_vault_auth_check(
     vault_url: str,
     vault_namespace: str | None,
@@ -158,6 +218,7 @@ def validate_vault_configuration(
     if has_vault_backed_fields:
         result.errors.extend(_collect_missing_env_vars())
     result.errors.extend(_collect_field_metadata_issues(settings_cls))
+    result.errors.extend(_collect_kv_version_issues(settings_cls))
 
     if not check_auth or not result.valid or not has_vault_backed_fields:
         return result

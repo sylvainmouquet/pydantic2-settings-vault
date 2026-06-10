@@ -6,17 +6,25 @@ from typing import Type
 from pydantic import SecretStr
 
 from pydantic2_settings_vault.features.authentication.backends import (
+    AlicloudAuthBackend,
     AppRoleAuthBackend,
     AwsAuthBackend,
     AzureAuthBackend,
     CertAuthBackend,
+    CfAuthBackend,
     GcpAuthBackend,
+    GithubAuthBackend,
     JwtAuthBackend,
+    KerberosAuthBackend,
     KubernetesAuthBackend,
     LdapAuthBackend,
     OciAuthBackend,
     OidcAuthBackend,
+    OktaAuthBackend,
+    PcfAuthBackend,
+    RadiusAuthBackend,
     TokenAuthBackend,
+    UserpassAuthBackend,
     VaultAuthBackend,
 )
 
@@ -35,6 +43,14 @@ _AUTH_BACKEND_BY_METHOD: dict[str, Type[VaultAuthBackend]] = {
     "cert": CertAuthBackend,
     "ldap": LdapAuthBackend,
     "oci": OciAuthBackend,
+    "userpass": UserpassAuthBackend,
+    "github": GithubAuthBackend,
+    "okta": OktaAuthBackend,
+    "kerberos": KerberosAuthBackend,
+    "radius": RadiusAuthBackend,
+    "alicloud": AlicloudAuthBackend,
+    "cf": CfAuthBackend,
+    "pcf": PcfAuthBackend,
 }
 
 
@@ -139,9 +155,7 @@ def get_auth_backend_from_env() -> VaultAuthBackend:
             client_key_path=os.environ["VAULT_CLIENT_KEY"],
             mount=mount,
             cert_name=os.getenv("VAULT_CERT_NAME"),
-            client_key_password=(
-                SecretStr(key_password) if key_password else None
-            ),
+            client_key_password=(SecretStr(key_password) if key_password else None),
         )
 
     if backend_cls is LdapAuthBackend:
@@ -161,6 +175,71 @@ def get_auth_backend_from_env() -> VaultAuthBackend:
                 vault_url,
                 resolved_mount,
             ),
+            mount=mount,
+        )
+
+    if backend_cls is UserpassAuthBackend:
+        return UserpassAuthBackend(
+            username=os.environ["VAULT_USERPASS_USERNAME"],
+            password=SecretStr(os.environ["VAULT_USERPASS_PASSWORD"]),
+            mount=mount,
+        )
+
+    if backend_cls is GithubAuthBackend:
+        return GithubAuthBackend(
+            token=SecretStr(os.environ["VAULT_GITHUB_TOKEN"]),
+            mount=mount,
+        )
+
+    if backend_cls is OktaAuthBackend:
+        return OktaAuthBackend(
+            username=os.environ["VAULT_OKTA_USERNAME"],
+            password=SecretStr(os.environ["VAULT_OKTA_PASSWORD"]),
+            mount=mount,
+            totp=os.getenv("VAULT_OKTA_TOTP"),
+            mfa_provider=os.getenv("VAULT_OKTA_MFA_PROVIDER"),
+        )
+
+    if backend_cls is KerberosAuthBackend:
+        return KerberosAuthBackend(
+            spnego_token=os.environ["VAULT_KERBEROS_TOKEN"],
+            mount=mount,
+        )
+
+    if backend_cls is RadiusAuthBackend:
+        return RadiusAuthBackend(
+            username=os.environ["VAULT_RADIUS_USERNAME"],
+            password=SecretStr(os.environ["VAULT_RADIUS_PASSWORD"]),
+            mount=mount,
+        )
+
+    if backend_cls is AlicloudAuthBackend:
+        role = os.environ["VAULT_ALICLOUD_ROLE"]
+        return AlicloudAuthBackend(
+            role=role,
+            mount=mount,
+            login_payload=AlicloudAuthBackend.resolve_login_payload(role),
+        )
+
+    if backend_cls is CfAuthBackend:
+        role = os.environ["VAULT_CF_ROLE"]
+        login_payload = CfAuthBackend.resolve_login_payload(role)
+        return CfAuthBackend(
+            role=role,
+            cf_instance_cert=login_payload["cf_instance_cert"],
+            signing_time=login_payload["signing_time"],
+            signature=login_payload["signature"],
+            mount=mount,
+        )
+
+    if backend_cls is PcfAuthBackend:
+        role = os.environ["VAULT_CF_ROLE"]
+        login_payload = PcfAuthBackend.resolve_login_payload(role)
+        return PcfAuthBackend(
+            role=role,
+            cf_instance_cert=login_payload["cf_instance_cert"],
+            signing_time=login_payload["signing_time"],
+            signature=login_payload["signature"],
             mount=mount,
         )
 
