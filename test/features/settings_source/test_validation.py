@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings
 from pydantic2_settings_vault import validate_vault_configuration
 from test.features.settings_source.conftest import (
     configure_vault_env,
+    configure_vault_token_env,
     parse_vault_credentials,
 )
 from test.features.settings_source.settings import AppSettings, ValidAppSettings
@@ -133,3 +134,16 @@ def test_validate_skips_auth_check_when_env_vars_missing(monkeypatch):
 
     assert not result.valid
     assert all(error.code != "auth_failed" for error in result.errors)
+
+
+@pytest.mark.asyncio
+async def test_validate_auth_check_succeeds_with_token_auth(
+    disable_logging_exception, vault_container
+):
+    credentials = vault_container.execute(["cat", "/vault-credentials.env"])
+    credentials_dict = parse_vault_credentials(credentials)
+    configure_vault_token_env(vault_container, credentials_dict)
+
+    result = validate_vault_configuration(ValidAppSettings, check_auth=True)
+
+    assert result.valid

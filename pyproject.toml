@@ -41,6 +41,16 @@ changelog = "https://github.com/sylvainmouquet/pydantic2-settings-vault/releases
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[project.optional-dependencies]
+aws = ["botocore>=1.35.0"]
+gcp = ["google-auth>=2.35.0"]
+azure = ["azure-identity>=1.19.0"]
+cloud = [
+    "botocore>=1.35.0",
+    "google-auth>=2.35.0",
+    "azure-identity>=1.19.0",
+]
+
 [dependency-groups]
 dev = [
     "anyio>=4.6.2.post1",

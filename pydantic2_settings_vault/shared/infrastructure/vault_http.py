@@ -6,6 +6,8 @@ from aiohttp import ClientSession
 import certifi
 from pydantic import SecretStr
 
+from pydantic2_settings_vault.features.authentication.backends import VaultAuthBackend
+
 CONST_HEADER_X_VAULT_TOKEN: str = "X-Vault-Token"
 CONST_HEADER_X_VAULT_NAMESPACE: str = "X-Vault-Namespace"
 
@@ -17,41 +19,59 @@ class InternalHttpVault:
     session: ClientSession
 
     def __init__(
-        self, url: str, namespace: str | None, role_id: SecretStr, secret_id: SecretStr
+        self,
+        url: str,
+        namespace: str | None,
+        auth_backend: VaultAuthBackend,
     ):
         self.url = url
         self.namespace = namespace
-        self.role_id = role_id
-        self.secret_id = secret_id
+        self.auth_backend = auth_backend
+
+    def _build_namespace_headers(self) -> dict[str, str]:
+        headers: dict[str, str] = {}
+        if self.namespace:
+            headers[CONST_HEADER_X_VAULT_NAMESPACE] = self.namespace
+        return headers
+
+    async def authenticate(self) -> None:
+        if not self.auth_backend.uses_login:
+            direct_token = self.auth_backend.direct_token
+            if direct_token is None:
+                raise ValueError(
+                    f"Vault {self.auth_backend.display_name()} auth requires a token."
+                )
+            self.token = direct_token
+            return
+
+        headers = self._build_namespace_headers()
+        login_url = f"{self.url}/v1/{self.auth_backend.login_path}"
+        async with self.session.post(
+            login_url,
+            json=self.auth_backend.build_login_payload(),
+            headers=headers,
+        ) as response:
+            if response.status == HTTPStatus.OK:
+                response_data = await response.json()
+                self.token = SecretStr(response_data["auth"]["client_token"])
+                return
+
+            error_msg = await response.text()
+            raise ValueError(
+                f"Failed to authenticate with Vault {self.auth_backend.display_name()}. "
+                f"Error code: {response.status}. Error message: {error_msg}"
+            )
 
     async def __aenter__(self):
         connector = aiohttp.TCPConnector(limit=10, ssl=ssl_context)
         timeout = aiohttp.ClientTimeout(total=30)
         self.session = ClientSession(connector=connector, timeout=timeout)
 
-        data = {
-            "role_id": self.role_id.get_secret_value(),
-            "secret_id": self.secret_id.get_secret_value(),
-        }
         try:
-            headers = {}
-            if self.namespace:
-                headers[CONST_HEADER_X_VAULT_NAMESPACE] = self.namespace
-            async with self.session.post(
-                f"{self.url}/v1/auth/approle/login", json=data, headers=headers
-            ) as response:
-                if response.status == HTTPStatus.OK:
-                    response_data = await response.json()
-                    self.token = SecretStr(response_data["auth"]["client_token"])
-                else:
-                    error_msg = await response.text()
-                    raise ValueError(
-                        "Failed to authenticate with Vault AppRole. "
-                        f"Error code: {response.status}. Error message: {error_msg}"
-                    )
-        except Exception as e:
+            await self.authenticate()
+        except Exception as exc:
             await self.session.close()
-            raise e
+            raise exc
 
         return self
 
@@ -64,9 +84,10 @@ class InternalHttpVault:
             raise ValueError("Authentication is mandatory")
 
         try:
-            headers = {CONST_HEADER_X_VAULT_TOKEN: self.token.get_secret_value()}
-            if self.namespace:
-                headers[CONST_HEADER_X_VAULT_NAMESPACE] = self.namespace
+            headers = {
+                CONST_HEADER_X_VAULT_TOKEN: self.token.get_secret_value(),
+                **self._build_namespace_headers(),
+            }
             async with self.session.get(
                 f"{self.url}/v1/{vault_path}",
                 headers=headers,
@@ -78,12 +99,12 @@ class InternalHttpVault:
                         for key, value in secrets["data"]["data"].items()
                     }
                     return result
-                else:
-                    error_msg = await response.text()
-                    raise ValueError(
-                        f"Failed to retrieve secret from Vault path '{vault_path}'. "
-                        f"Error code: {response.status}. Error message: {error_msg}"
-                    )
-        except Exception as e:
+
+                error_msg = await response.text()
+                raise ValueError(
+                    f"Failed to retrieve secret from Vault path '{vault_path}'. "
+                    f"Error code: {response.status}. Error message: {error_msg}"
+                )
+        except Exception as exc:
             await self.session.close()
-            raise e
+            raise exc

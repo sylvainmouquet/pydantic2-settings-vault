@@ -7,16 +7,25 @@ SHOW_EXCEPTIONS = False
 
 def parse_vault_credentials(credentials: str) -> dict[str, str]:
     return dict(
-        line.split("=", maxsplit=1)
-        for line in credentials.splitlines()
-        if "=" in line
+        line.split("=", maxsplit=1) for line in credentials.splitlines() if "=" in line
     )
 
 
 def configure_vault_env(vault_container, credentials_dict: dict[str, str]) -> None:
+    os.environ["VAULT_AUTH_METHOD"] = "approle"
     os.environ["VAULT_ROLE_ID"] = credentials_dict["ROLE_ID"]
     os.environ["VAULT_SECRET_ID"] = credentials_dict["SECRET_ID"]
     os.environ["VAULT_URL"] = f"http://{vault_container.host}:{vault_container.port}"
+
+
+def configure_vault_token_env(
+    vault_container, credentials_dict: dict[str, str]
+) -> None:
+    os.environ["VAULT_AUTH_METHOD"] = "token"
+    os.environ["VAULT_TOKEN"] = credentials_dict["ROOT_TOKEN"]
+    os.environ["VAULT_URL"] = f"http://{vault_container.host}:{vault_container.port}"
+    os.environ.pop("VAULT_ROLE_ID", None)
+    os.environ.pop("VAULT_SECRET_ID", None)
 
 
 @pytest.fixture

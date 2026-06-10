@@ -86,7 +86,7 @@ class AppSettings(BaseSettings):
             VaultConfigSettingsSource(settings_cls=settings_cls), #   add this line
         )
 
-# The connection to Vault is done via HTTPS with AppRole authentication
+# The connection to Vault is done via HTTPS with AppRole authentication (default)
 import os
 os.environ['VAULT_URL'] = "<configure it>"
 os.environ['VAULT_ROLE_ID'] = "<configure it>"
@@ -94,6 +94,54 @@ os.environ['VAULT_SECRET_ID'] = "<configure it>"
 
 # Only with Enterprise edition
 os.environ['VAULT_NAMESPACE'] = "<configure it>"
+```
+
+#### Authentication methods
+
+Select the auth backend with `VAULT_AUTH_METHOD` (default: `approle`). Override the mount path with optional `VAULT_AUTH_MOUNT`.
+
+| Method | `VAULT_AUTH_METHOD` | Required environment variables |
+| --- | --- | --- |
+| AppRole (default) | `approle` | `VAULT_ROLE_ID`, `VAULT_SECRET_ID` |
+| Token | `token` | `VAULT_TOKEN` |
+| Kubernetes | `kubernetes` | `VAULT_K8S_ROLE`, plus `VAULT_K8S_JWT` or service-account token file |
+| AWS | `aws` | `VAULT_AWS_ROLE`, plus signed STS request env vars or `botocore` credentials |
+| GCP | `gcp` | `VAULT_GCP_ROLE`, plus `VAULT_GCP_JWT` or `GOOGLE_APPLICATION_CREDENTIALS` |
+| Azure | `azure` | `VAULT_AZURE_ROLE`, plus `VAULT_AZURE_JWT` or Azure managed identity |
+
+Common variables for every method:
+
+- `VAULT_URL` — Vault API address (default: `http://127.0.0.1:8200`)
+- `VAULT_NAMESPACE` — optional Enterprise namespace
+- `VAULT_AUTH_MOUNT` — optional auth mount override (defaults: `approle`, `token`, `kubernetes`, `aws`, `gcp`, `azure`)
+
+**Token auth** uses a pre-issued token directly; no login call is made.
+
+**Kubernetes auth** reads the service-account JWT from `VAULT_K8S_JWT` or, by default, `/var/run/secrets/kubernetes.io/serviceaccount/token`.
+
+**AWS auth** signs an STS `GetCallerIdentity` request with instance profile, environment keys, or web identity when `botocore` is installed (`pip install pydantic2-settings-vault[aws]`). You can also supply a pre-signed request via `VAULT_AWS_IAM_REQUEST_URL`, `VAULT_AWS_IAM_REQUEST_BODY`, and `VAULT_AWS_IAM_REQUEST_HEADERS`.
+
+**GCP auth** obtains a service-account JWT from `google-auth` when installed (`pip install pydantic2-settings-vault[gcp]`), or from `VAULT_GCP_JWT`.
+
+**Azure auth** obtains a managed-identity or service-principal token from `azure-identity` when installed (`pip install pydantic2-settings-vault[azure]`), or from `VAULT_AZURE_JWT`.
+
+Example token auth:
+
+```python
+os.environ["VAULT_AUTH_METHOD"] = "token"
+os.environ["VAULT_TOKEN"] = "<configure it>"
+os.environ["VAULT_URL"] = "<configure it>"
+```
+
+Example Kubernetes auth:
+
+```python
+os.environ["VAULT_AUTH_METHOD"] = "kubernetes"
+os.environ["VAULT_K8S_ROLE"] = "<vault role>"
+os.environ["VAULT_URL"] = "<configure it>"
+# Optional: os.environ["VAULT_K8S_JWT"] = "<service account jwt>"
+# Optional: os.environ["VAULT_AUTH_MOUNT"] = "kubernetes"
+```
 
 ### Pre-startup validation
 

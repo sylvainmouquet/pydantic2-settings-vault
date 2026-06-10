@@ -4,11 +4,12 @@ import os
 from dataclasses import dataclass, field
 from typing import Any
 
-from pydantic import SecretStr
 from pydantic_settings import BaseSettings
 
-from pydantic2_settings_vault.features.settings_source.source import (
-    VaultConfigSettingsSource,
+from pydantic2_settings_vault.features.authentication.registry import (
+    get_auth_backend_from_env,
+    get_required_env_vars_for_method,
+    resolve_auth_method,
 )
 from pydantic2_settings_vault.shared.infrastructure.vault_http import InternalHttpVault
 
@@ -37,20 +38,24 @@ class VaultValidationResult:
 
 
 def _collect_missing_env_vars(
-    env_vars: tuple[str, ...] = VaultConfigSettingsSource.REQUIRED_AUTH_ENV_VARS,
+    env_vars: tuple[str, ...] | None = None,
 ) -> list[VaultValidationIssue]:
     issues: list[VaultValidationIssue] = []
-    missing_env_vars = [env_var for env_var in env_vars if not os.getenv(env_var)]
+    required_env_vars = env_vars or get_required_env_vars_for_method()
+    missing_env_vars = [
+        env_var for env_var in required_env_vars if not os.getenv(env_var)
+    ]
 
     if missing_env_vars:
         missing_env_vars_text = ", ".join(missing_env_vars)
+        auth_method = resolve_auth_method()
         issues.append(
             VaultValidationIssue(
                 code="missing_env_vars",
                 message=(
                     "Missing required Vault environment variables: "
-                    f"{missing_env_vars_text}. Configure AppRole credentials before "
-                    "loading Vault-backed settings."
+                    f"{missing_env_vars_text}. Configure {auth_method} auth credentials "
+                    "before loading Vault-backed settings."
                 ),
             )
         )
@@ -105,15 +110,12 @@ def _collect_field_metadata_issues(
 def _run_vault_auth_check(
     vault_url: str,
     vault_namespace: str | None,
-    vault_role_id: SecretStr,
-    vault_secret_id: SecretStr,
 ) -> VaultValidationIssue | None:
     async def _authenticate() -> None:
         async with InternalHttpVault(
             url=vault_url,
             namespace=vault_namespace,
-            role_id=vault_role_id,
-            secret_id=vault_secret_id,
+            auth_backend=get_auth_backend_from_env(),
         ):
             return
 
@@ -129,9 +131,10 @@ def _run_vault_auth_check(
         with concurrent.futures.ThreadPoolExecutor() as executor:
             executor.submit(run_async_method).result()
     except Exception as exc:
+        auth_method = resolve_auth_method()
         return VaultValidationIssue(
             code="auth_failed",
-            message=f"Vault authentication check failed: {exc}",
+            message=f"Vault {auth_method} authentication check failed: {exc}",
         )
 
     return None
@@ -146,8 +149,8 @@ def validate_vault_configuration(
 ) -> VaultValidationResult:
     """Validate Vault environment variables and field metadata for a settings model.
 
-    When ``check_auth`` is enabled, performs a dry-run AppRole authentication against
-    Vault without fetching secrets.
+    When ``check_auth`` is enabled, performs a dry-run authentication against Vault
+    using the configured auth method without fetching secrets.
     """
     result = VaultValidationResult()
     has_vault_backed_fields = bool(_iter_vault_backed_fields(settings_cls))
@@ -167,8 +170,6 @@ def validate_vault_configuration(
     auth_issue = _run_vault_auth_check(
         vault_url=resolved_vault_url,
         vault_namespace=resolved_vault_namespace,
-        vault_role_id=SecretStr(os.environ["VAULT_ROLE_ID"]),
-        vault_secret_id=SecretStr(os.environ["VAULT_SECRET_ID"]),
     )
     if auth_issue is not None:
         result.errors.append(auth_issue)

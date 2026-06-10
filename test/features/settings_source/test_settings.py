@@ -6,6 +6,7 @@ from pydantic_core._pydantic_core import ValidationError
 
 from test.features.settings_source.conftest import (
     configure_vault_env,
+    configure_vault_token_env,
     parse_vault_credentials,
 )
 from test.features.settings_source.settings import (
@@ -64,3 +65,19 @@ async def test_invalid_get_secret(disable_logging_exception, vault_container, ca
     assert "UNKNOWN" in caplog.text
     assert "secret/data/test" in caplog.text
     assert "BAR" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_valid_get_secret_with_token_auth(
+    disable_logging_exception, vault_container
+):
+    credentials = vault_container.execute(["cat", "/vault-credentials.env"])
+    credentials_dict = parse_vault_credentials(credentials)
+    configure_vault_token_env(vault_container, credentials_dict)
+
+    vault_container.execute(
+        ["vault", "kv", "put", "-mount=secret", "test", "FOO=BAR"],
+    )
+
+    settings: ValidAppSettings = get_valid_app_settings()
+    assert settings.FOO.get_secret_value() == "BAR"

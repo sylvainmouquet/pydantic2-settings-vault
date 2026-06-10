@@ -10,6 +10,11 @@ from pydantic.fields import FieldInfo
 from pydantic_settings import PydanticBaseSettingsSource
 from reattempt import reattempt
 
+from pydantic2_settings_vault.features.authentication.registry import (
+    get_auth_backend_from_env,
+    get_required_env_vars_for_method,
+    resolve_auth_method,
+)
 from pydantic2_settings_vault.shared.infrastructure.vault_http import InternalHttpVault
 
 logger = logging.getLogger("pydantic2-settings-vault")
@@ -18,26 +23,25 @@ logger.addHandler(logging.NullHandler())
 
 class VaultConfigSettingsSource(PydanticBaseSettingsSource):
     CONST_HEADER_X_VAULT_TOKEN: str = "X-Vault-Token"
-    REQUIRED_AUTH_ENV_VARS: tuple[str, str] = ("VAULT_ROLE_ID", "VAULT_SECRET_ID")
 
     @classmethod
-    def _get_vault_credentials(cls) -> tuple[SecretStr, SecretStr]:
+    def _get_auth_backend(cls):
         missing_env_vars = [
-            env_var for env_var in cls.REQUIRED_AUTH_ENV_VARS if not os.getenv(env_var)
+            env_var
+            for env_var in get_required_env_vars_for_method()
+            if not os.getenv(env_var)
         ]
 
         if missing_env_vars:
             missing_env_vars_text = ", ".join(missing_env_vars)
+            auth_method = resolve_auth_method()
             raise ValueError(
                 "Missing required Vault environment variables: "
-                f"{missing_env_vars_text}. Configure AppRole credentials before "
-                "loading Vault-backed settings."
+                f"{missing_env_vars_text}. Configure {auth_method} auth credentials "
+                "before loading Vault-backed settings."
             )
 
-        return (
-            SecretStr(os.environ["VAULT_ROLE_ID"]),
-            SecretStr(os.environ["VAULT_SECRET_ID"]),
-        )
+        return get_auth_backend_from_env()
 
     @staticmethod
     def _get_field_vault_metadata(field_name: str, field: FieldInfo) -> tuple[str, str]:
@@ -75,7 +79,7 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
     def __call__(self) -> dict[str, Any]:
         vault_url: str = os.getenv("VAULT_URL", default="http://127.0.0.1:8200")
         vault_namespace: str | None = os.getenv("VAULT_NAMESPACE")
-        vault_role_id, vault_secret_id = self._get_vault_credentials()
+        auth_backend = self._get_auth_backend()
 
         d: dict[str, Any] = {}
 
@@ -107,8 +111,7 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
             async with InternalHttpVault(
                 url=vault_url,
                 namespace=vault_namespace,
-                role_id=vault_role_id,
-                secret_id=vault_secret_id,
+                auth_backend=auth_backend,
             ) as vault:
                 vault_path_list: list[str] = await _get_list_vault_paths()
                 vault_secrets_list: list[dict[str, SecretStr]] = await asyncio.gather(

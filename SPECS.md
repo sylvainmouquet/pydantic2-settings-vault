@@ -88,11 +88,11 @@ Extend authentication beyond AppRole so applications can use any [built-in Vault
 
 **Phase 1 — machine and cloud-native (highest priority for settings loading)**
 
-- [ ] **Token** — authenticate with a pre-issued `VAULT_TOKEN` (no login call; token used directly on secret requests)
-- [ ] **Kubernetes** — service-account JWT login via `/v1/auth/<mount>/login`
-- [ ] **AWS** — IAM credentials (instance profile, env keys, or web identity) via `/v1/auth/<mount>/login`
-- [ ] **GCP** — service-account JWT via `/v1/auth/<mount>/login`
-- [ ] **Azure** — managed identity or service principal via `/v1/auth/<mount>/login`
+- [x] **Token** — authenticate with a pre-issued `VAULT_TOKEN` (no login call; token used directly on secret requests)
+- [x] **Kubernetes** — service-account JWT login via `/v1/auth/<mount>/login`
+- [x] **AWS** — IAM credentials (instance profile, env keys, or web identity) via `/v1/auth/<mount>/login`
+- [x] **GCP** — service-account JWT via `/v1/auth/<mount>/login`
+- [x] **Azure** — managed identity or service principal via `/v1/auth/<mount>/login`
 
 **Phase 2 — workload identity and certificates**
 
@@ -115,13 +115,15 @@ Extend authentication beyond AppRole so applications can use any [built-in Vault
 
 **Cross-cutting requirements**
 
-- [ ] Shared `VaultAuthBackend` protocol used by `InternalHttpVault` instead of hard-coded AppRole login
-- [ ] Configurable auth mount path per method (Vault allows multiple mounts of the same type)
-- [ ] Method-specific required env vars validated by `validate_vault_configuration`
-- [ ] Dry-run auth check (`check_auth=True`) works for every supported method
-- [ ] Document per-method env vars, mount paths, and recommended deployment patterns in `README.md`
+- [x] Shared `VaultAuthBackend` protocol used by `InternalHttpVault` instead of hard-coded AppRole login
+- [x] Configurable auth mount path per method (Vault allows multiple mounts of the same type)
+- [x] Method-specific required env vars validated by `validate_vault_configuration`
+- [x] Dry-run auth check (`check_auth=True`) works for every supported method
+- [x] Document per-method env vars, mount paths, and recommended deployment patterns in `README.md`
 
 **Potential files:** `pydantic2_settings_vault/features/authentication/`, `pydantic2_settings_vault/shared/infrastructure/vault_http.py`, `pydantic2_settings_vault/features/settings_source/validation.py`, `test/features/authentication/`, `README.md`
+
+**Key files:** `pydantic2_settings_vault/features/authentication/backends.py`, `pydantic2_settings_vault/features/authentication/registry.py`, `pydantic2_settings_vault/shared/infrastructure/vault_http.py`, `pydantic2_settings_vault/features/settings_source/validation.py`, `test/features/authentication/test_backends.py`, `README.md`
 
 ### 7. Improve testing and mocking
 
@@ -271,4 +273,4 @@ Support [HashiCorp Vault Enterprise](https://www.hashicorp.com/products/vault) d
 - Async supported via event loop management, sync fallback via thread executor
 - All critical HTTP logic and field mapping reside in core `__init__.py`
 - All fields are always type checked and validated using Pydantic's mechanisms
-- **Planned auth architecture:** one `VaultAuthBackend` implementation per built-in Vault auth method under `features/authentication/`; `InternalHttpVault` delegates login to the selected backend and reuses the returned client token for secret fetches
+- **Planned auth architecture:** one `VaultAuthBackend` implementation per built-in Vault auth method under `features/authentication/`; `InternalHttpVault` delegates login to the selected backend and reuses the returned client token for secret fetches. Phase 1 backends (token, kubernetes, aws, gcp, azure) are implemented; AppRole remains the default for backward compatibility.
