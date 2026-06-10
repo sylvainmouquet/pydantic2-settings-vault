@@ -79,17 +79,48 @@ Acts as a drop-in settings source for Pydantic v2. Users just add the source, an
 
 ## Medium impact — broadens scope
 
-### 6. Support additional Vault auth methods
+### 6. Support all HashiCorp Vault auth methods
 
 **Status:** Planned
 
-Add more Vault authentication strategies for applications that do not use AppRole.
+Extend authentication beyond AppRole so applications can use any [built-in Vault auth method](https://developer.hashicorp.com/vault/docs/auth) appropriate to their runtime. Introduce a pluggable auth backend selected via configuration (for example `VAULT_AUTH_METHOD` and method-specific environment variables), with support for custom mount paths (`auth/<mount>`).
 
-- [ ] Implement support for Vault Token authentication
-- [ ] Implement support for AWS IAM authentication
-- [ ] Implement support for Kubernetes Service Account authentication
+**Phase 1 — machine and cloud-native (highest priority for settings loading)**
 
-**Potential files:** `pydantic2_settings_vault/__init__.py`
+- [ ] **Token** — authenticate with a pre-issued `VAULT_TOKEN` (no login call; token used directly on secret requests)
+- [ ] **Kubernetes** — service-account JWT login via `/v1/auth/<mount>/login`
+- [ ] **AWS** — IAM credentials (instance profile, env keys, or web identity) via `/v1/auth/<mount>/login`
+- [ ] **GCP** — service-account JWT via `/v1/auth/<mount>/login`
+- [ ] **Azure** — managed identity or service principal via `/v1/auth/<mount>/login`
+
+**Phase 2 — workload identity and certificates**
+
+- [ ] **JWT** — generic JWT/OIDC bearer login
+- [ ] **OIDC** — OIDC provider login (including role-based claims)
+- [ ] **Cert** — TLS client-certificate authentication
+- [ ] **LDAP** — bind DN and password login
+- [ ] **OCI** — Oracle Cloud instance principal or API key login
+
+**Phase 3 — human and legacy integrations**
+
+- [ ] **Userpass** — username and password login
+- [ ] **GitHub** — GitHub personal access token login
+- [ ] **Okta** — Okta API token login
+- [ ] **Kerberos** — SPNEGO/GSSAPI login
+- [ ] **RADIUS** — RADIUS username and password login
+- [ ] **Alicloud** — Alibaba Cloud RAM credential login
+- [ ] **CF** — Cloud Foundry instance credential login
+- [ ] **PCF** — legacy PCF instance credential login (if still required by deployments)
+
+**Cross-cutting requirements**
+
+- [ ] Shared `VaultAuthBackend` protocol used by `InternalHttpVault` instead of hard-coded AppRole login
+- [ ] Configurable auth mount path per method (Vault allows multiple mounts of the same type)
+- [ ] Method-specific required env vars validated by `validate_vault_configuration`
+- [ ] Dry-run auth check (`check_auth=True`) works for every supported method
+- [ ] Document per-method env vars, mount paths, and recommended deployment patterns in `README.md`
+
+**Potential files:** `pydantic2_settings_vault/features/authentication/`, `pydantic2_settings_vault/shared/infrastructure/vault_http.py`, `pydantic2_settings_vault/features/settings_source/validation.py`, `test/features/authentication/`, `README.md`
 
 ### 7. Improve testing and mocking
 
@@ -159,16 +190,16 @@ Improve error messages and logs so setup issues are easier to understand during 
 
 ### 12. Configuration validation helper
 
-**Status:** Planned
+**Status:** Done
 
 Provide a lightweight way to validate Vault connectivity, authentication, and field metadata before an application starts serving traffic.
 
-- [ ] Add a helper that checks required Vault environment variables
-- [ ] Validate that mapped fields include both path and key metadata
-- [ ] Optionally perform a dry-run Vault authentication check
-- [ ] Return structured validation errors suitable for CI or startup checks
+- [x] Add a helper that checks required Vault environment variables
+- [x] Validate that mapped fields include both path and key metadata
+- [x] Optionally perform a dry-run Vault authentication check
+- [x] Return structured validation errors suitable for CI or startup checks
 
-**Potential files:** `pydantic2_settings_vault/__init__.py`, `tests/`, `README.md`
+**Key files:** `pydantic2_settings_vault/features/settings_source/validation.py`, `pydantic2_settings_vault/__init__.py`, `test/features/settings_source/test_validation.py`, `README.md`
 
 ---
 
@@ -178,9 +209,8 @@ Provide a lightweight way to validate Vault connectivity, authentication, and fi
 
 **Status:** Planned
 
-Deepen HashiCorp Vault integration so the library covers more real-world deployment patterns without adding other secret backends.
+Deepen HashiCorp Vault integration so the library covers more real-world deployment patterns without adding other secret backends. Authentication method coverage is tracked in feature 6.
 
-- [ ] Explore additional Vault authentication methods beyond AppRole
 - [ ] Support KV engine version selection and path conventions
 - [ ] Explore Vault namespace and enterprise-compatible configuration
 - [ ] Document recommended Vault policies and field-mapping patterns
@@ -215,7 +245,7 @@ Support long-running applications that need to keep Vault authentication healthy
 
 - [ ] Optional secret cache and duplicate request reduction
 - [ ] Configuration validation helper
-- [ ] Additional Vault authentication methods
+- [ ] All HashiCorp Vault auth methods (feature 6, phased rollout)
 
 ---
 
@@ -226,3 +256,4 @@ Support long-running applications that need to keep Vault authentication healthy
 - Async supported via event loop management, sync fallback via thread executor
 - All critical HTTP logic and field mapping reside in core `__init__.py`
 - All fields are always type checked and validated using Pydantic's mechanisms
+- **Planned auth architecture:** one `VaultAuthBackend` implementation per built-in Vault auth method under `features/authentication/`; `InternalHttpVault` delegates login to the selected backend and reuses the returned client token for secret fetches

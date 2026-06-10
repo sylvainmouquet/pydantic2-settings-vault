@@ -95,6 +95,25 @@ os.environ['VAULT_SECRET_ID'] = "<configure it>"
 # Only with Enterprise edition
 os.environ['VAULT_NAMESPACE'] = "<configure it>"
 
+### Pre-startup validation
+
+Validate Vault environment variables and field metadata before loading settings:
+
+```python
+from pydantic2_settings_vault import validate_vault_configuration
+
+result = validate_vault_configuration(AppSettings)
+if not result.valid:
+    for issue in result.errors:
+        print(f"{issue.code}: {issue.message}")
+
+# Or fail fast during application startup:
+validate_vault_configuration(AppSettings).raise_if_invalid()
+
+# Optionally verify Vault authentication without fetching secrets:
+validate_vault_configuration(AppSettings, check_auth=True).raise_if_invalid()
+```
+
 ### Usage
 app_settings_lock = Lock()
 
