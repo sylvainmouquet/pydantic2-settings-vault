@@ -49,6 +49,8 @@ just lint
 just format
 just type-check
 just check
+just docs-serve
+just docs-build
 ```
 
 ---

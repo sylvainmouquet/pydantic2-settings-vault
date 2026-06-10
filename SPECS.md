@@ -139,15 +139,15 @@ Add comprehensive automated tests that cover Vault API responses, field mapping,
 
 ### 8. Usage documentation
 
-**Status:** Planned
+**Status:** Done
 
 Provide practical usage examples for configuring settings models, annotating fields, and preparing Vault policies.
 
-- [ ] Document field annotation patterns
-- [ ] Add end-to-end configuration examples
-- [ ] Explain expected Vault policies and environment variables
+- [x] Document field annotation patterns
+- [x] Add end-to-end configuration examples
+- [x] Explain expected Vault policies and environment variables
 
-**Potential files:** `README.md`, `docs/`
+**Key files:** `README.md`, `docs/usage.md`, `docs/vault-kv-and-policies.md`
 
 ### 9. Configurable Vault client controls
 

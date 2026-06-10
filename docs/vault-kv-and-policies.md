@@ -147,4 +147,4 @@ When using `VAULT_NAMESPACE`, policies are defined inside that namespace. The li
 | `VAULT_NAMESPACE` | Optional Enterprise namespace |
 | `VAULT_AUTH_METHOD` | Authentication method (default `approle`) |
 
-See [README.md](../README.md) for authentication configuration.
+See [Authentication](authentication.md) for auth configuration. See the [Usage guide](usage.md) for end-to-end setup and field annotation patterns.

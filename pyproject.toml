@@ -33,7 +33,7 @@ classifiers = [
 
 [project.urls]
 homepage = "https://github.com/sylvainmouquet/pydantic2-settings-vault"
-documentation = "https://github.com/sylvainmouquet/pydantic2-settings-vault"
+documentation = "https://sylvainmouquet.github.io/pydantic2-settings-vault/"
 repository = "https://github.com/sylvainmouquet/pydantic2-settings-vault"
 changelog = "https://github.com/sylvainmouquet/pydantic2-settings-vault/releases"
 
@@ -58,6 +58,8 @@ cloud = [
 
 [dependency-groups]
 dev = [
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.5.0",
     "anyio>=4.6.2.post1",
     "asyncpg>=0.30.0",
     "loguru>=0.7.2",

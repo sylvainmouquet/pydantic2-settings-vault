@@ -1,5 +1,7 @@
 # Development
 
+For usage examples, field annotations, and Vault policy setup, see the [user documentation](https://sylvainmouquet.github.io/pydantic2-settings-vault/) or [usage.md](usage.md).
+
 ## Prerequisites
 
 - [uv](https://docs.astral.sh/uv/)

@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- MkDocs Material user documentation site with GitHub Pages deployment (`mkdocs.yml`, `just docs-serve`, `just docs-build`, CI workflow).
+- User guides: [Authentication](docs/authentication.md) and [Advanced configuration](docs/advanced-configuration.md).
 - `VaultClientConfig` to tune Vault HTTP timeouts, retry backoff, and secret-fetch concurrency on `VaultConfigSettingsSource`, with `for_local()`, `for_ci()`, and `for_production()` presets.
 - Optional in-memory Vault secret cache via `VaultConfigSettingsSource(cache_enabled=True, cache_ttl_seconds=...)`, or an explicit `VaultSecretCache` instance passed as `secret_cache`. Cache is disabled by default.
 - `VaultSecretCache` public type for shared, TTL-based secret caching across repeated settings loads.
@@ -22,6 +24,7 @@ All notable changes to this project will be documented in this file.
 - Phase 3 Vault auth backends: userpass, github, okta, kerberos, radius, alicloud, cf, and pcf.
 - Optional `[cf]` dependency group for Cloud Foundry login signature generation.
 - Shared Vault HTTP mock helpers and unit tests for `InternalHttpVault` and `VaultConfigSettingsSource` failure modes (missing keys, auth errors, HTTP errors, network failures).
+- Usage guide in `docs/usage.md` covering field annotations, end-to-end setup, environment variables, and Vault policies.
 
 ### Changed
 

@@ -8,8 +8,9 @@ Simple extension of [pydantic_settings](https://docs.pydantic.dev/latest/concept
 __pydantic2-settings-vault__ is a extension for Pydantic Settings that enables secure configuration management by integrating with __HashiCorp Vault__. This library supports both the open-source (OSS) and Enterprise versions of Vault, providing a seamless way to retrieve and manage secrets within your Pydantic-based applications. By leveraging Vault's robust security features, __pydantic2-settings-vault__ allows developers to easily incorporate secure secret management practices into their Python projects, enhancing overall application security and simplifying the handling of sensitive configuration data.
 
   - [Installation](#installation)
+  - [Documentation](#documentation)
+  - [Quick start](#quick-start)
   - [Development](#development)
-  - [Demonstration](#demonstration)
   - [License](#license)
   - [Contact](#contact)
 
@@ -32,6 +33,77 @@ uv
 uv add pydantic2-settings-vault
 ```
 
+## Documentation
+
+User documentation is published with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/):
+
+**https://sylvainmouquet.github.io/pydantic2-settings-vault/**
+
+Build or preview locally:
+
+```bash
+just docs-serve   # live reload at http://127.0.0.1:8000
+just docs-build   # static site in site/
+```
+
+| Guide | Description |
+| --- | --- |
+| [Usage guide](docs/usage.md) | Field annotations, end-to-end setup, environment variables, Vault policies |
+| [Authentication](docs/authentication.md) | All supported Vault auth methods |
+| [Advanced configuration](docs/advanced-configuration.md) | HTTP client tuning, secret cache, pre-startup validation |
+| [Vault KV & policies](docs/vault-kv-and-policies.md) | KV v1/v2 paths, policy examples, field-mapping patterns |
+| [Development](docs/development.md) | Local development and testing |
+
+## Quick start
+
+See the [usage guide](https://sylvainmouquet.github.io/pydantic2-settings-vault/usage/) for the full guide. Minimal setup:
+
+```python
+from pydantic import Field, SecretStr
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
+from pydantic2_settings_vault import VaultConfigSettingsSource
+
+
+class AppSettings(BaseSettings):
+    API_KEY: SecretStr = Field(
+        ...,
+        json_schema_extra={
+            "vault_secret_path": "secret/myapp/config",
+            "vault_secret_key": "api_key",
+        },
+    )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
+        return (
+            init_settings,
+            env_settings,
+            dotenv_settings,
+            VaultConfigSettingsSource(settings_cls=settings_cls),
+        )
+```
+
+Set AppRole credentials and load settings:
+
+```bash
+export VAULT_URL="https://vault.example.com:8200"
+export VAULT_ROLE_ID="<role-id>"
+export VAULT_SECRET_ID="<secret-id>"
+```
+
+```python
+settings = AppSettings()
+```
+
+For KV v2 (default), use the logical path `mount/secret-name` in field metadata; the library adds the `/data/` segment for HTTP reads.
+
 ## Development
 
 This project uses [Just](https://github.com/casey/just) as its task runner. Install [uv](https://docs.astral.sh/uv/) and [just](https://github.com/casey/just), then:
@@ -44,6 +116,8 @@ just lint         # ruff check and format verification
 just format       # auto-fix lint issues and format code
 just type-check   # pyright static analysis
 just check        # lint, type-check, and test
+just docs-serve   # preview user documentation (MkDocs)
+just docs-build   # build user documentation
 just build        # build package (requires VERSION env var)
 ```
 
@@ -55,76 +129,9 @@ just --list
 
 See [docs/development.md](docs/development.md) for the full task reference.
 
-### Getting started
+## Authentication methods
 
-Create a class __AppSettings__ that inherit of __BaseSettings__ . 
-
-Create a field for each vault secret. 
-
-ex: 
-```python
-MY_SECRET: SecretStr = Field(
-        ...,
-        json_schema_extra={
-            "vault_secret_path": "secret/test",
-            "vault_secret_key": "FOO",  # pragma: allowlist secret
-        },
-    )
-```
-
-For KV v2 (default), use the logical path `mount/secret-name`. The library adds the `/data/` segment for Vault HTTP reads. You can also pass the full API path `secret/data/test`. See [docs/vault-kv-and-policies.md](docs/vault-kv-and-policies.md) for KV v1, policies, and field-mapping patterns.
-
-#### Full example
-```python
-from functools import lru_cache
-from threading import Lock
-from typing import Tuple, Type
-from pydantic import Field, SecretStr
-from pydantic_settings import (
-    BaseSettings,
-    PydanticBaseSettingsSource,
-)
-from pydantic2_settings_vault import VaultConfigSettingsSource
-
-class AppSettings(BaseSettings):
-
-    MY_SECRET: SecretStr = Field(
-        ...,
-        json_schema_extra={
-            "vault_secret_path": "secret/test",
-            "vault_secret_key": "FOO",  # pragma: allowlist secret
-        },
-    )
-    
-    @classmethod
-    def settings_customise_sources(
-        cls,
-        settings_cls: Type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,
-        env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
-    ) -> Tuple[PydanticBaseSettingsSource, ...]:
-        return (
-            init_settings,
-            env_settings,
-            dotenv_settings,
-            VaultConfigSettingsSource(settings_cls=settings_cls), #   add this line
-        )
-
-# The connection to Vault is done via HTTPS with AppRole authentication (default)
-import os
-os.environ['VAULT_URL'] = "<configure it>"
-os.environ['VAULT_ROLE_ID'] = "<configure it>"
-os.environ['VAULT_SECRET_ID'] = "<configure it>"
-
-# Only with Enterprise edition
-os.environ['VAULT_NAMESPACE'] = "<configure it>"
-```
-
-#### Authentication methods
-
-Select the auth backend with `VAULT_AUTH_METHOD` (default: `approle`). Override the mount path with optional `VAULT_AUTH_MOUNT`.
+Select the auth backend with `VAULT_AUTH_METHOD` (default: `approle`). Override the mount path with optional `VAULT_AUTH_MOUNT`. Per-method setup examples and policy guidance are in the [authentication guide](https://sylvainmouquet.github.io/pydantic2-settings-vault/authentication/).
 
 | Method | `VAULT_AUTH_METHOD` | Required environment variables |
 | --- | --- | --- |
@@ -209,6 +216,8 @@ os.environ["VAULT_URL"] = "<configure it>"
 # Optional: os.environ["VAULT_AUTH_MOUNT"] = "kubernetes"
 ```
 
+## Advanced configuration
+
 ### Vault client controls
 
 Tune HTTP timeouts, retry behavior, and fetch concurrency via ``VaultClientConfig``:
@@ -280,16 +289,8 @@ validate_vault_configuration(AppSettings).raise_if_invalid()
 validate_vault_configuration(AppSettings, check_auth=True).raise_if_invalid()
 ```
 
-### Usage
-app_settings_lock = Lock()
+## How it works
 
-@lru_cache
-def get_app_settings() -> AppSettings:
-    with app_settings_lock:
-        return AppSettings()  # type: ignore
-```
-
-### Internal interactions:
 ```mermaid
 sequenceDiagram
     participant A as Your Application

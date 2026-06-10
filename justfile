@@ -72,3 +72,15 @@ check-deps:
 # Run type checking
 type-check:
     PYRIGHT_PYTHON_FORCE_VERSION=latest uv run pyright
+
+# Build user documentation (MkDocs)
+docs-build:
+    uv run mkdocs build --strict
+
+# Serve user documentation locally
+docs-serve:
+    uv run mkdocs serve
+
+# Deploy documentation to GitHub Pages (requires gh auth)
+docs-deploy:
+    uv run mkdocs gh-deploy --force
