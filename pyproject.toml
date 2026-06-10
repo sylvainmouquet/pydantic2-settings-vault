@@ -45,10 +45,13 @@ build-backend = "hatchling.build"
 aws = ["botocore>=1.35.0"]
 gcp = ["google-auth>=2.35.0"]
 azure = ["azure-identity>=1.19.0"]
+oci = ["oci>=2.135.0", "requests>=2.32.0"]
 cloud = [
     "botocore>=1.35.0",
     "google-auth>=2.35.0",
     "azure-identity>=1.19.0",
+    "oci>=2.135.0",
+    "requests>=2.32.0",
 ]
 
 [dependency-groups]
@@ -61,7 +64,9 @@ dev = [
     "pycontainers",
     "pytest>=8.3.3",
     "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
     "pytest-mock>=3.14.0",
+    "pyright>=1.1.390",
     "python-on-whales>=0.73.0",
     "ruff>=0.6.7",
 ]

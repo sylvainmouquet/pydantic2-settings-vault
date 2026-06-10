@@ -8,6 +8,7 @@ Simple extension of [pydantic_settings](https://docs.pydantic.dev/latest/concept
 __pydantic2-settings-vault__ is a extension for Pydantic Settings that enables secure configuration management by integrating with __HashiCorp Vault__. This library supports both the open-source (OSS) and Enterprise versions of Vault, providing a seamless way to retrieve and manage secrets within your Pydantic-based applications. By leveraging Vault's robust security features, __pydantic2-settings-vault__ allows developers to easily incorporate secure secret management practices into their Python projects, enhancing overall application security and simplifying the handling of sensitive configuration data.
 
   - [Installation](#installation)
+  - [Development](#development)
   - [Demonstration](#demonstration)
   - [License](#license)
   - [Contact](#contact)
@@ -30,6 +31,29 @@ uv
 ```bash
 uv add pydantic2-settings-vault
 ```
+
+## Development
+
+This project uses [Just](https://github.com/casey/just) as its task runner. Install [uv](https://docs.astral.sh/uv/) and [just](https://github.com/casey/just), then:
+
+```bash
+just install      # install dependencies
+just test         # run tests
+just coverage     # run tests with 100% coverage enforcement
+just lint         # ruff check and format verification
+just format       # auto-fix lint issues and format code
+just type-check   # pyright static analysis
+just check        # lint, type-check, and test
+just build        # build package (requires VERSION env var)
+```
+
+List all recipes:
+
+```bash
+just --list
+```
+
+See [docs/development.md](docs/development.md) for the full task reference.
 
 ### Getting started
 
@@ -108,12 +132,17 @@ Select the auth backend with `VAULT_AUTH_METHOD` (default: `approle`). Override 
 | AWS | `aws` | `VAULT_AWS_ROLE`, plus signed STS request env vars or `botocore` credentials |
 | GCP | `gcp` | `VAULT_GCP_ROLE`, plus `VAULT_GCP_JWT` or `GOOGLE_APPLICATION_CREDENTIALS` |
 | Azure | `azure` | `VAULT_AZURE_ROLE`, plus `VAULT_AZURE_JWT` or Azure managed identity |
+| JWT | `jwt` | `VAULT_JWT_ROLE`, `VAULT_JWT` |
+| OIDC | `oidc` | `VAULT_OIDC_ROLE`, plus `VAULT_OIDC_JWT` or `VAULT_OIDC_ID_TOKEN` |
+| Cert | `cert` | `VAULT_CLIENT_CERT`, `VAULT_CLIENT_KEY`, optional `VAULT_CERT_NAME` |
+| LDAP | `ldap` | `VAULT_LDAP_USERNAME`, `VAULT_LDAP_PASSWORD` |
+| OCI | `oci` | `VAULT_OCI_ROLE`, plus signed request headers or `oci` SDK credentials |
 
 Common variables for every method:
 
 - `VAULT_URL` — Vault API address (default: `http://127.0.0.1:8200`)
 - `VAULT_NAMESPACE` — optional Enterprise namespace
-- `VAULT_AUTH_MOUNT` — optional auth mount override (defaults: `approle`, `token`, `kubernetes`, `aws`, `gcp`, `azure`)
+- `VAULT_AUTH_MOUNT` — optional auth mount override (defaults: `approle`, `token`, `kubernetes`, `aws`, `gcp`, `azure`, `jwt`, `oidc`, `cert`, `ldap`, `oci`)
 
 **Token auth** uses a pre-issued token directly; no login call is made.
 
@@ -124,6 +153,16 @@ Common variables for every method:
 **GCP auth** obtains a service-account JWT from `google-auth` when installed (`pip install pydantic2-settings-vault[gcp]`), or from `VAULT_GCP_JWT`.
 
 **Azure auth** obtains a managed-identity or service-principal token from `azure-identity` when installed (`pip install pydantic2-settings-vault[azure]`), or from `VAULT_AZURE_JWT`.
+
+**JWT auth** sends a signed bearer token to the JWT auth mount (`POST /v1/auth/jwt/login`).
+
+**OIDC auth** sends an OIDC ID token to the OIDC/JWT mount. Use `VAULT_OIDC_JWT` or `VAULT_OIDC_ID_TOKEN`. For Microsoft Entra ID distributed claims, set optional `VAULT_OIDC_DISTRIBUTED_CLAIM_ACCESS_TOKEN`.
+
+**Cert auth** presents a TLS client certificate during login (`POST /v1/auth/cert/login`). Set `VAULT_CLIENT_CERT` and `VAULT_CLIENT_KEY`; optionally `VAULT_CERT_NAME` to target a specific certificate role.
+
+**LDAP auth** binds with username and password (`POST /v1/auth/ldap/login/<username>`).
+
+**OCI auth** signs a GET request to the OCI login endpoint. Provide pre-signed headers via `VAULT_OCI_REQUEST_HEADERS`, or install `oci` (`pip install pydantic2-settings-vault[oci]`) and use instance principal (`VAULT_OCI_AUTH_TYPE=instance`, default) or API key (`VAULT_OCI_AUTH_TYPE=api_key` with standard OCI config).
 
 Example token auth:
 

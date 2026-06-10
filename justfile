@@ -39,11 +39,26 @@ install-local:
 test *args:
     uv run --python ${PYTHON_VERSION:-3.14} pytest -v --log-cli-level=INFO {{args}}
 
-# Lint command
-lint:
+# Coverage command (100% threshold per project policy)
+coverage *args:
+    uv run --python ${PYTHON_VERSION:-3.14} pytest \
+        --cov=pydantic2_settings_vault \
+        --cov-report=term-missing \
+        --cov-fail-under=100 \
+        -v {{args}}
+
+# Format command
+format:
     uv run ruff check --fix
     uv run ruff format
+
+# Lint command
+lint:
+    uv run ruff check
     uv run ruff format --check
+
+# Run lint, type-check, and tests
+check: lint type-check test
 
 # Update dependencies
 update:

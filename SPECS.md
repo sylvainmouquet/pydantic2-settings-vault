@@ -96,11 +96,11 @@ Extend authentication beyond AppRole so applications can use any [built-in Vault
 
 **Phase 2 — workload identity and certificates**
 
-- [ ] **JWT** — generic JWT/OIDC bearer login
-- [ ] **OIDC** — OIDC provider login (including role-based claims)
-- [ ] **Cert** — TLS client-certificate authentication
-- [ ] **LDAP** — bind DN and password login
-- [ ] **OCI** — Oracle Cloud instance principal or API key login
+- [x] **JWT** — generic JWT/OIDC bearer login
+- [x] **OIDC** — OIDC provider login (including role-based claims)
+- [x] **Cert** — TLS client-certificate authentication
+- [x] **LDAP** — bind DN and password login
+- [x] **OCI** — Oracle Cloud instance principal or API key login
 
 **Phase 3 — human and legacy integrations**
 
@@ -268,6 +268,7 @@ Support [HashiCorp Vault Enterprise](https://www.hashicorp.com/products/vault) d
 
 ## Architecture notes
 
+- Task runner: [Just](https://github.com/casey/just) (`justfile`) — use `just install`, `just test`, `just lint`, `just format`, and `just check` for local development
 - Single settings source class: `VaultConfigSettingsSource`
 - Vault API coordination: `InternalHttpVault`
 - Async supported via event loop management, sync fallback via thread executor

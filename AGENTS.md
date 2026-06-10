@@ -37,5 +37,21 @@ Consider implementing additional agents/extensions for:
 
 ---
 
+## Development
+
+Use the project `justfile` for all local tasks:
+
+```bash
+just install
+just test
+just coverage
+just lint
+just format
+just type-check
+just check
+```
+
+---
+
 ## Contact
 For questions, open issues or submit PRs on the project repository.

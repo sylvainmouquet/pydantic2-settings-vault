@@ -1,6 +1,7 @@
 import base64
 import json
-from unittest.mock import AsyncMock, MagicMock
+import ssl
+from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 import pytest
 from pydantic import SecretStr
@@ -9,8 +10,13 @@ from pydantic2_settings_vault.features.authentication.backends import (
     AppRoleAuthBackend,
     AwsAuthBackend,
     AzureAuthBackend,
+    CertAuthBackend,
     GcpAuthBackend,
+    JwtAuthBackend,
     KubernetesAuthBackend,
+    LdapAuthBackend,
+    OciAuthBackend,
+    OidcAuthBackend,
     TokenAuthBackend,
 )
 from pydantic2_settings_vault.features.authentication.registry import (
@@ -277,3 +283,258 @@ async def test_internal_http_vault_login_failure():
 
     with pytest.raises(ValueError, match="Failed to authenticate with Vault approle"):
         await vault.authenticate()
+
+
+def test_jwt_auth_backend_builds_payload():
+    backend = JwtAuthBackend(role="dev", jwt=SecretStr("signed-jwt"))
+
+    assert backend.build_login_payload() == {
+        "role": "dev",
+        "jwt": "signed-jwt",
+    }
+    assert backend.login_path == "auth/jwt/login"
+
+
+def test_oidc_auth_backend_builds_payload():
+    backend = OidcAuthBackend(
+        role="dev",
+        jwt=SecretStr("id-token"),
+        distributed_claim_access_token=SecretStr("graph-token"),
+    )
+
+    assert backend.build_login_payload() == {
+        "role": "dev",
+        "jwt": "id-token",
+        "distributed_claim_access_token": "graph-token",
+    }
+    assert backend.login_path == "auth/oidc/login"
+
+
+def test_oidc_auth_backend_prefers_env_jwt(monkeypatch):
+    monkeypatch.setenv("VAULT_OIDC_JWT", "inline-oidc-jwt")
+
+    jwt = OidcAuthBackend.resolve_jwt()
+
+    assert jwt.get_secret_value() == "inline-oidc-jwt"
+
+
+def test_oidc_auth_backend_accepts_id_token_env(monkeypatch):
+    monkeypatch.delenv("VAULT_OIDC_JWT", raising=False)
+    monkeypatch.setenv("VAULT_OIDC_ID_TOKEN", "id-token-value")
+
+    jwt = OidcAuthBackend.resolve_jwt()
+
+    assert jwt.get_secret_value() == "id-token-value"
+
+
+def test_cert_auth_backend_builds_payload():
+    backend = CertAuthBackend(
+        client_cert_path="/tmp/cert.pem",
+        client_key_path="/tmp/key.pem",
+        cert_name="web",
+    )
+
+    assert backend.build_login_payload() == {"name": "web"}
+    assert backend.login_path == "auth/cert/login"
+
+
+def test_cert_auth_backend_omits_name_when_unset():
+    backend = CertAuthBackend(
+        client_cert_path="/tmp/cert.pem",
+        client_key_path="/tmp/key.pem",
+    )
+
+    assert backend.build_login_payload() == {}
+
+
+def test_cert_auth_backend_loads_client_ssl(tmp_path):
+    cert_file = tmp_path / "cert.pem"
+    key_file = tmp_path / "key.pem"
+    cert_file.write_text("cert", encoding="utf-8")
+    key_file.write_text("key", encoding="utf-8")
+
+    backend = CertAuthBackend(
+        client_cert_path=str(cert_file),
+        client_key_path=str(key_file),
+    )
+
+    with pytest.raises(ssl.SSLError):
+        backend.client_ssl_for_login
+
+
+def test_ldap_auth_backend_builds_payload():
+    backend = LdapAuthBackend(
+        username="mitchellh",
+        password=SecretStr("secret"),
+        mount="corp-ldap",
+    )
+
+    assert backend.build_login_payload() == {"password": "secret"}
+    assert backend.login_path == "auth/corp-ldap/login/mitchellh"
+
+
+def test_oci_auth_backend_builds_payload():
+    headers = {
+        "date": ["Fri, 22 Aug 2019 21:02:19 GMT"],
+        "(request-target)": ["get /v1/auth/oci/login/devrole"],
+        "host": ["127.0.0.1"],
+        "authorization": ["Signature ..."],
+    }
+    backend = OciAuthBackend(role="devrole", request_headers=headers)
+
+    assert backend.build_login_payload() == {"request_headers": headers}
+    assert backend.login_path == "auth/oci/login/devrole"
+
+
+def test_oci_auth_backend_uses_pre_signed_headers(monkeypatch):
+    headers = {
+        "date": ["Fri, 22 Aug 2019 21:02:19 GMT"],
+        "(request-target)": ["get /v1/auth/oci/login/demo"],
+        "host": ["127.0.0.1"],
+        "authorization": ["Signature ..."],
+    }
+    monkeypatch.setenv("VAULT_OCI_REQUEST_HEADERS", json.dumps(headers))
+
+    resolved = OciAuthBackend.resolve_request_headers(
+        "demo",
+        "http://127.0.0.1:8200",
+        "oci",
+    )
+
+    assert resolved == headers
+
+
+def test_get_required_env_vars_for_phase2_methods():
+    assert get_required_env_vars_for_method("jwt") == ("VAULT_JWT_ROLE", "VAULT_JWT")
+    assert get_required_env_vars_for_method("oidc") == ("VAULT_OIDC_ROLE",)
+    assert get_required_env_vars_for_method("cert") == (
+        "VAULT_CLIENT_CERT",
+        "VAULT_CLIENT_KEY",
+    )
+    assert get_required_env_vars_for_method("ldap") == (
+        "VAULT_LDAP_USERNAME",
+        "VAULT_LDAP_PASSWORD",
+    )
+    assert get_required_env_vars_for_method("oci") == ("VAULT_OCI_ROLE",)
+
+
+def test_get_auth_backend_from_env_jwt(monkeypatch):
+    monkeypatch.setenv("VAULT_AUTH_METHOD", "jwt")
+    monkeypatch.setenv("VAULT_JWT_ROLE", "dev")
+    monkeypatch.setenv("VAULT_JWT", "signed-jwt")
+
+    backend = get_auth_backend_from_env()
+
+    assert isinstance(backend, JwtAuthBackend)
+    assert backend.build_login_payload()["jwt"] == "signed-jwt"
+
+
+def test_get_auth_backend_from_env_ldap(monkeypatch):
+    monkeypatch.setenv("VAULT_AUTH_METHOD", "ldap")
+    monkeypatch.setenv("VAULT_LDAP_USERNAME", "alice")
+    monkeypatch.setenv("VAULT_LDAP_PASSWORD", "secret")
+
+    backend = get_auth_backend_from_env()
+
+    assert isinstance(backend, LdapAuthBackend)
+    assert backend.login_path == "auth/ldap/login/alice"
+
+
+def test_get_auth_backend_from_env_oci(monkeypatch):
+    headers = {
+        "date": ["Fri, 22 Aug 2019 21:02:19 GMT"],
+        "(request-target)": ["get /v1/auth/oci/login/demo"],
+        "host": ["127.0.0.1"],
+        "authorization": ["Signature ..."],
+    }
+    monkeypatch.setenv("VAULT_AUTH_METHOD", "oci")
+    monkeypatch.setenv("VAULT_OCI_ROLE", "demo")
+    monkeypatch.setenv("VAULT_OCI_REQUEST_HEADERS", json.dumps(headers))
+
+    backend = get_auth_backend_from_env()
+
+    assert isinstance(backend, OciAuthBackend)
+    assert backend.request_headers == headers
+
+
+@pytest.mark.asyncio
+async def test_internal_http_vault_ldap_login():
+    backend = LdapAuthBackend(
+        username="alice",
+        password=SecretStr("secret"),
+    )
+    vault = InternalHttpVault(
+        url="http://127.0.0.1:8200",
+        namespace=None,
+        auth_backend=backend,
+    )
+
+    response = AsyncMock()
+    response.status = 200
+    response.json = AsyncMock(return_value={"auth": {"client_token": "vault-token"}})
+    response.__aenter__ = AsyncMock(return_value=response)
+    response.__aexit__ = AsyncMock(return_value=False)
+
+    vault.session = MagicMock()
+    vault.session.post = MagicMock(return_value=response)
+
+    await vault.authenticate()
+
+    vault.session.post.assert_called_once_with(
+        "http://127.0.0.1:8200/v1/auth/ldap/login/alice",
+        json={"password": "secret"},
+        headers={},
+    )
+    assert vault.token.get_secret_value() == "vault-token"
+
+
+@pytest.mark.asyncio
+async def test_internal_http_vault_cert_login_uses_mtls(monkeypatch):
+    mock_ssl_context = ssl.create_default_context()
+    monkeypatch.setattr(
+        CertAuthBackend,
+        "client_ssl_for_login",
+        PropertyMock(return_value=mock_ssl_context),
+    )
+    backend = CertAuthBackend(
+        client_cert_path="/tmp/cert.pem",
+        client_key_path="/tmp/key.pem",
+        cert_name="web",
+    )
+
+    vault = InternalHttpVault(
+        url="https://127.0.0.1:8200",
+        namespace=None,
+        auth_backend=backend,
+    )
+
+    response = AsyncMock()
+    response.status = 200
+    response.json = AsyncMock(return_value={"auth": {"client_token": "vault-token"}})
+    response.__aenter__ = AsyncMock(return_value=response)
+    response.__aexit__ = AsyncMock(return_value=False)
+
+    login_session = MagicMock()
+    login_session.post = MagicMock(return_value=response)
+    login_session.__aenter__ = AsyncMock(return_value=login_session)
+    login_session.__aexit__ = AsyncMock(return_value=False)
+
+    vault.session = AsyncMock()
+    vault.session.closed = False
+
+    session_factory = MagicMock(return_value=login_session)
+    monkeypatch.setattr(
+        "pydantic2_settings_vault.shared.infrastructure.vault_http.ClientSession",
+        session_factory,
+    )
+
+    await vault.authenticate()
+
+    session_factory.assert_called_once()
+    login_session.post.assert_called_once_with(
+        "https://127.0.0.1:8200/v1/auth/cert/login",
+        json={"name": "web"},
+        headers={},
+    )
+    vault.session.post.assert_not_called()
+    assert vault.token.get_secret_value() == "vault-token"

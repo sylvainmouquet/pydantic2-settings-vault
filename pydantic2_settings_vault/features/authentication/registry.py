@@ -9,8 +9,13 @@ from pydantic2_settings_vault.features.authentication.backends import (
     AppRoleAuthBackend,
     AwsAuthBackend,
     AzureAuthBackend,
+    CertAuthBackend,
     GcpAuthBackend,
+    JwtAuthBackend,
     KubernetesAuthBackend,
+    LdapAuthBackend,
+    OciAuthBackend,
+    OidcAuthBackend,
     TokenAuthBackend,
     VaultAuthBackend,
 )
@@ -25,6 +30,11 @@ _AUTH_BACKEND_BY_METHOD: dict[str, Type[VaultAuthBackend]] = {
     "aws": AwsAuthBackend,
     "gcp": GcpAuthBackend,
     "azure": AzureAuthBackend,
+    "jwt": JwtAuthBackend,
+    "oidc": OidcAuthBackend,
+    "cert": CertAuthBackend,
+    "ldap": LdapAuthBackend,
+    "oci": OciAuthBackend,
 }
 
 
@@ -58,6 +68,7 @@ def get_auth_backend_from_env() -> VaultAuthBackend:
         )
 
     mount = _resolve_mount(backend_cls)
+    resolved_mount = mount or backend_cls.default_mount
 
     if backend_cls is TokenAuthBackend:
         return TokenAuthBackend(
@@ -100,6 +111,56 @@ def get_auth_backend_from_env() -> VaultAuthBackend:
         return AzureAuthBackend(
             role=os.environ["VAULT_AZURE_ROLE"],
             jwt=AzureAuthBackend.resolve_jwt(),
+            mount=mount,
+        )
+
+    if backend_cls is JwtAuthBackend:
+        return JwtAuthBackend(
+            role=os.environ["VAULT_JWT_ROLE"],
+            jwt=SecretStr(os.environ["VAULT_JWT"]),
+            mount=mount,
+        )
+
+    if backend_cls is OidcAuthBackend:
+        distributed_token = os.getenv("VAULT_OIDC_DISTRIBUTED_CLAIM_ACCESS_TOKEN")
+        return OidcAuthBackend(
+            role=os.environ["VAULT_OIDC_ROLE"],
+            jwt=OidcAuthBackend.resolve_jwt(),
+            mount=mount,
+            distributed_claim_access_token=(
+                SecretStr(distributed_token) if distributed_token else None
+            ),
+        )
+
+    if backend_cls is CertAuthBackend:
+        key_password = os.getenv("VAULT_CLIENT_KEY_PASSWORD")
+        return CertAuthBackend(
+            client_cert_path=os.environ["VAULT_CLIENT_CERT"],
+            client_key_path=os.environ["VAULT_CLIENT_KEY"],
+            mount=mount,
+            cert_name=os.getenv("VAULT_CERT_NAME"),
+            client_key_password=(
+                SecretStr(key_password) if key_password else None
+            ),
+        )
+
+    if backend_cls is LdapAuthBackend:
+        return LdapAuthBackend(
+            username=os.environ["VAULT_LDAP_USERNAME"],
+            password=SecretStr(os.environ["VAULT_LDAP_PASSWORD"]),
+            mount=mount,
+        )
+
+    if backend_cls is OciAuthBackend:
+        role = os.environ["VAULT_OCI_ROLE"]
+        vault_url = os.getenv("VAULT_URL", "http://127.0.0.1:8200")
+        return OciAuthBackend(
+            role=role,
+            request_headers=OciAuthBackend.resolve_request_headers(
+                role,
+                vault_url,
+                resolved_mount,
+            ),
             mount=mount,
         )
 

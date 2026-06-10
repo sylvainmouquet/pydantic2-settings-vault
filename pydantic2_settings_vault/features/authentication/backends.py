@@ -3,11 +3,14 @@ from __future__ import annotations
 import base64
 import json
 import os
+import ssl
 from abc import ABC, abstractmethod
+from email.utils import formatdate
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 from urllib.parse import urlparse
 
+import certifi
 from pydantic import SecretStr
 
 DEFAULT_K8S_JWT_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
@@ -41,9 +44,14 @@ class VaultAuthBackend(ABC):
     def login_path(self) -> str:
         return f"auth/{self.mount}/login"
 
+    @property
+    def client_ssl_for_login(self) -> ssl.SSLContext | None:
+        """Return an SSL context with a client certificate for mTLS login, if required."""
+        return None
+
     @abstractmethod
-    def build_login_payload(self) -> dict[str, str]:
-        """Build the JSON body for POST ``/v1/auth/<mount>/login``."""
+    def build_login_payload(self) -> dict[str, Any]:
+        """Build the JSON body for the auth login request."""
 
     @classmethod
     def display_name(cls) -> str:
@@ -70,7 +78,7 @@ class TokenAuthBackend(VaultAuthBackend):
     def direct_token(self) -> SecretStr:
         return self._token
 
-    def build_login_payload(self) -> dict[str, str]:
+    def build_login_payload(self) -> dict[str, Any]:
         raise RuntimeError("Token auth does not use a login endpoint")
 
 
@@ -92,7 +100,7 @@ class AppRoleAuthBackend(VaultAuthBackend):
     def required_env_vars(cls) -> tuple[str, ...]:
         return ("VAULT_ROLE_ID", "VAULT_SECRET_ID")
 
-    def build_login_payload(self) -> dict[str, str]:
+    def build_login_payload(self) -> dict[str, Any]:
         return {
             "role_id": self.role_id.get_secret_value(),
             "secret_id": self.secret_id.get_secret_value(),
@@ -132,7 +140,7 @@ class KubernetesAuthBackend(VaultAuthBackend):
 
         return SecretStr(jwt_file.read_text(encoding="utf-8").strip())
 
-    def build_login_payload(self) -> dict[str, str]:
+    def build_login_payload(self) -> dict[str, Any]:
         return {
             "role": self.role,
             "jwt": self.jwt.get_secret_value(),
@@ -226,7 +234,7 @@ class AwsAuthBackend(VaultAuthBackend):
 
         return cls.generate_iam_login_payload(role, iam_server_id=iam_server_id)
 
-    def build_login_payload(self) -> dict[str, str]:
+    def build_login_payload(self) -> dict[str, Any]:
         if self._login_payload is not None:
             return self._login_payload
         return self.resolve_login_payload(self.role)
@@ -281,7 +289,7 @@ class GcpAuthBackend(VaultAuthBackend):
 
         return SecretStr(credentials.token)
 
-    def build_login_payload(self) -> dict[str, str]:
+    def build_login_payload(self) -> dict[str, Any]:
         return {
             "role": self.role,
             "jwt": self.jwt.get_secret_value(),
@@ -326,8 +334,244 @@ class AzureAuthBackend(VaultAuthBackend):
         token = credential.get_token(resource)
         return SecretStr(token.token)
 
-    def build_login_payload(self) -> dict[str, str]:
+    def build_login_payload(self) -> dict[str, Any]:
         return {
             "role": self.role,
             "jwt": self.jwt.get_secret_value(),
         }
+
+
+class JwtAuthBackend(VaultAuthBackend):
+    method_name = "jwt"
+    default_mount = "jwt"
+
+    def __init__(
+        self,
+        role: str,
+        jwt: SecretStr,
+        mount: str | None = None,
+    ) -> None:
+        super().__init__(mount=mount)
+        self.role = role
+        self.jwt = jwt
+
+    @classmethod
+    def required_env_vars(cls) -> tuple[str, ...]:
+        return ("VAULT_JWT_ROLE", "VAULT_JWT")
+
+    def build_login_payload(self) -> dict[str, Any]:
+        return {
+            "role": self.role,
+            "jwt": self.jwt.get_secret_value(),
+        }
+
+
+class OidcAuthBackend(VaultAuthBackend):
+    method_name = "oidc"
+    default_mount = "oidc"
+
+    def __init__(
+        self,
+        role: str,
+        jwt: SecretStr,
+        mount: str | None = None,
+        *,
+        distributed_claim_access_token: SecretStr | None = None,
+    ) -> None:
+        super().__init__(mount=mount)
+        self.role = role
+        self.jwt = jwt
+        self.distributed_claim_access_token = distributed_claim_access_token
+
+    @classmethod
+    def required_env_vars(cls) -> tuple[str, ...]:
+        return ("VAULT_OIDC_ROLE",)
+
+    @classmethod
+    def resolve_jwt(cls) -> SecretStr:
+        if jwt_value := os.getenv("VAULT_OIDC_JWT"):
+            return SecretStr(jwt_value)
+        if jwt_value := os.getenv("VAULT_OIDC_ID_TOKEN"):
+            return SecretStr(jwt_value)
+        raise ValueError(
+            "OIDC auth requires VAULT_OIDC_JWT or VAULT_OIDC_ID_TOKEN."
+        )
+
+    def build_login_payload(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "role": self.role,
+            "jwt": self.jwt.get_secret_value(),
+        }
+        if self.distributed_claim_access_token is not None:
+            payload["distributed_claim_access_token"] = (
+                self.distributed_claim_access_token.get_secret_value()
+            )
+        return payload
+
+
+class CertAuthBackend(VaultAuthBackend):
+    method_name = "cert"
+    default_mount = "cert"
+
+    def __init__(
+        self,
+        client_cert_path: str,
+        client_key_path: str,
+        mount: str | None = None,
+        *,
+        cert_name: str | None = None,
+        client_key_password: SecretStr | None = None,
+    ) -> None:
+        super().__init__(mount=mount)
+        self.client_cert_path = client_cert_path
+        self.client_key_path = client_key_path
+        self.cert_name = cert_name
+        self.client_key_password = client_key_password
+
+    @classmethod
+    def required_env_vars(cls) -> tuple[str, ...]:
+        return ("VAULT_CLIENT_CERT", "VAULT_CLIENT_KEY")
+
+    @property
+    def client_ssl_for_login(self) -> ssl.SSLContext:
+        context = ssl.create_default_context(cafile=certifi.where())
+        password = (
+            self.client_key_password.get_secret_value()
+            if self.client_key_password is not None
+            else None
+        )
+        context.load_cert_chain(
+            certfile=self.client_cert_path,
+            keyfile=self.client_key_path,
+            password=password,
+        )
+        return context
+
+    def build_login_payload(self) -> dict[str, Any]:
+        if self.cert_name:
+            return {"name": self.cert_name}
+        return {}
+
+
+class LdapAuthBackend(VaultAuthBackend):
+    method_name = "ldap"
+    default_mount = "ldap"
+
+    def __init__(
+        self,
+        username: str,
+        password: SecretStr,
+        mount: str | None = None,
+    ) -> None:
+        super().__init__(mount=mount)
+        self.username = username
+        self.password = password
+
+    @classmethod
+    def required_env_vars(cls) -> tuple[str, ...]:
+        return ("VAULT_LDAP_USERNAME", "VAULT_LDAP_PASSWORD")
+
+    @property
+    def login_path(self) -> str:
+        return f"auth/{self.mount}/login/{self.username}"
+
+    def build_login_payload(self) -> dict[str, Any]:
+        return {"password": self.password.get_secret_value()}
+
+
+class OciAuthBackend(VaultAuthBackend):
+    method_name = "oci"
+    default_mount = "oci"
+
+    def __init__(
+        self,
+        role: str,
+        request_headers: dict[str, list[str]],
+        mount: str | None = None,
+    ) -> None:
+        super().__init__(mount=mount)
+        self.role = role
+        self.request_headers = request_headers
+
+    @classmethod
+    def required_env_vars(cls) -> tuple[str, ...]:
+        return ("VAULT_OCI_ROLE",)
+
+    @property
+    def login_path(self) -> str:
+        return f"auth/{self.mount}/login/{self.role}"
+
+    @classmethod
+    def resolve_request_headers(
+        cls,
+        role: str,
+        vault_url: str,
+        mount: str,
+    ) -> dict[str, list[str]]:
+        if headers_json := os.getenv("VAULT_OCI_REQUEST_HEADERS"):
+            headers = json.loads(headers_json)
+            if not isinstance(headers, dict):
+                raise ValueError(
+                    "VAULT_OCI_REQUEST_HEADERS must be a JSON object mapping "
+                    "header names to string lists."
+                )
+            return headers
+
+        try:
+            import oci
+            import requests
+        except ImportError as exc:
+            raise ImportError(
+                "OCI auth requires the oci package. Install with "
+                "'pip install pydantic2-settings-vault[oci]' or set "
+                "VAULT_OCI_REQUEST_HEADERS with pre-signed request headers."
+            ) from exc
+
+        parsed = urlparse(vault_url)
+        host = parsed.hostname or "127.0.0.1"
+        if parsed.port and parsed.port not in (80, 443):
+            host_header = f"{host}:{parsed.port}"
+        else:
+            host_header = host
+
+        login_url = f"{vault_url.rstrip('/')}/v1/auth/{mount}/login/{role}"
+        request_target = f"get /v1/auth/{mount}/login/{role}"
+
+        auth_type = os.getenv("VAULT_OCI_AUTH_TYPE", "instance").lower()
+        if auth_type == "instance":
+            signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
+        elif auth_type == "api_key":
+            config = oci.config.from_file(
+                file_location=os.getenv("OCI_CONFIG_FILE"),
+                profile_name=os.getenv("OCI_CONFIG_PROFILE"),
+            )
+            signer = oci.signer.Signer(
+                tenancy=config["tenancy"],
+                user=config["user"],
+                fingerprint=config["fingerprint"],
+                private_key_file_location=config.get("key_file"),
+                pass_phrase=config.get("pass_phrase"),
+                private_key_content=config.get("key_content"),
+            )
+        else:
+            raise ValueError(
+                "VAULT_OCI_AUTH_TYPE must be 'instance' or 'api_key', "
+                f"not {auth_type!r}."
+            )
+
+        prepared_request = requests.Request("GET", login_url).prepare()
+        prepared_request.headers["date"] = formatdate(usegmt=True)
+        signer(prepared_request)
+
+        headers: dict[str, list[str]] = {
+            "date": [prepared_request.headers["date"]],
+            "(request-target)": [request_target],
+            "host": [host_header],
+            "authorization": [prepared_request.headers["authorization"]],
+        }
+        if content_type := prepared_request.headers.get("content-type"):
+            headers["content-type"] = [content_type]
+        return headers
+
+    def build_login_payload(self) -> dict[str, Any]:
+        return {"request_headers": self.request_headers}

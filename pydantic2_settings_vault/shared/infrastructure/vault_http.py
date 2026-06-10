@@ -46,9 +46,38 @@ class InternalHttpVault:
 
         headers = self._build_namespace_headers()
         login_url = f"{self.url}/v1/{self.auth_backend.login_path}"
-        async with self.session.post(
+        login_payload = self.auth_backend.build_login_payload()
+        client_ssl = self.auth_backend.client_ssl_for_login
+
+        if client_ssl is not None:
+            connector = aiohttp.TCPConnector(limit=1, ssl=client_ssl)
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with ClientSession(connector=connector, timeout=timeout) as login_session:
+                await self._perform_login(
+                    login_session,
+                    login_url,
+                    login_payload,
+                    headers,
+                )
+            return
+
+        await self._perform_login(
+            self.session,
             login_url,
-            json=self.auth_backend.build_login_payload(),
+            login_payload,
+            headers,
+        )
+
+    async def _perform_login(
+        self,
+        session: ClientSession,
+        login_url: str,
+        login_payload: dict,
+        headers: dict[str, str],
+    ) -> None:
+        async with session.post(
+            login_url,
+            json=login_payload,
             headers=headers,
         ) as response:
             if response.status == HTTPStatus.OK:
