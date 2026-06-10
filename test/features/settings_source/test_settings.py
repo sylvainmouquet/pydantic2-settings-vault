@@ -1,10 +1,13 @@
 import logging
-import os
 
 from loguru import logger
 import pytest
 from pydantic_core._pydantic_core import ValidationError
 
+from test.features.settings_source.conftest import (
+    configure_vault_env,
+    parse_vault_credentials,
+)
 from test.features.settings_source.settings import (
     ValidAppSettings,
     get_invalid_app_settings,
@@ -29,16 +32,11 @@ def test_missing_vault_credentials_error_mentions_required_env_vars(monkeypatch)
 async def test_valid_get_secret(disable_logging_exception, vault_container):
     # Read the vault credentials from the file
     credentials = vault_container.execute(["cat", "/vault-credentials.env"])
-    credentials_dict = dict(line.split("=") for line in credentials.splitlines())
-    role_id = credentials_dict.get("ROLE_ID")
-    secret_id = credentials_dict.get("SECRET_ID")
-
-    os.environ["VAULT_ROLE_ID"] = role_id
-    os.environ["VAULT_SECRET_ID"] = secret_id
+    credentials_dict = parse_vault_credentials(credentials)
+    configure_vault_env(vault_container, credentials_dict)
 
     vault_container.execute(
         ["vault", "kv", "put", "-mount=secret", "test", "FOO=BAR"],
-        envs={"VAULT_ADDR": "http://127.0.0.1:8200"},
     )
 
     settings: ValidAppSettings = get_valid_app_settings()
@@ -52,16 +50,11 @@ async def test_invalid_get_secret(disable_logging_exception, vault_container, ca
 
     # Read the vault credentials from the file
     credentials = vault_container.execute(["cat", "/vault-credentials.env"])
-    credentials_dict = dict(line.split("=") for line in credentials.splitlines())
-    role_id = credentials_dict.get("ROLE_ID")
-    secret_id = credentials_dict.get("SECRET_ID")
-
-    os.environ["VAULT_ROLE_ID"] = role_id
-    os.environ["VAULT_SECRET_ID"] = secret_id
+    credentials_dict = parse_vault_credentials(credentials)
+    configure_vault_env(vault_container, credentials_dict)
 
     vault_container.execute(
         ["vault", "kv", "put", "-mount=secret", "test", "FOO=BAR"],
-        envs={"VAULT_ADDR": "http://127.0.0.1:8200"},
     )
 
     with pytest.raises(ValidationError):

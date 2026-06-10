@@ -48,6 +48,7 @@ dev = [
     "loguru>=0.7.2",
     "pip>=24.2",
     "pydocks>=1.2.0",
+    "pycontainers",
     "pytest>=8.3.3",
     "pytest-asyncio>=0.24.0",
     "pytest-mock>=3.14.0",
@@ -56,8 +57,8 @@ dev = [
 ]
 
 [tool.uv.sources]
-pydantic2-settings-vault = { path = "pydantic2_settings_vault" }
-# pydocks = { path = "../pydocks" }
+pydocks = { path = "../pydocks" }
+pycontainers = { path = "../pycontainers" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["pydantic2_settings_vault"]

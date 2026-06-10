@@ -12,7 +12,8 @@ Python package for managing app secrets in Pydantic v2 settings from HashiCorp V
 
 Enables secure authentication to Vault using the AppRole method. Reads credentials from environment variables and establishes an HTTP session for secret lookups.
 
-- [x] Reads `VAULT_URL`, `VAULT_NAMESPACE`, `VAULT_ROLE_ID`, `VAULT_SECRET_ID` from environment variables
+- [x] Reads `VAULT_URL`, `VAULT_ROLE_ID`, `VAULT_SECRET_ID` from environment variables
+- [x] Reads optional `VAULT_NAMESPACE` for HashiCorp Vault Enterprise deployments (see feature 15)
 - [x] Authenticates via POST to `/v1/auth/approle/login`
 - [x] Stores received token for future secret requests
 - [x] Handles errors and closes the HTTP session safely
@@ -212,7 +213,6 @@ Provide a lightweight way to validate Vault connectivity, authentication, and fi
 Deepen HashiCorp Vault integration so the library covers more real-world deployment patterns without adding other secret backends. Authentication method coverage is tracked in feature 6.
 
 - [ ] Support KV engine version selection and path conventions
-- [ ] Explore Vault namespace and enterprise-compatible configuration
 - [ ] Document recommended Vault policies and field-mapping patterns
 
 **Potential files:** `pydantic2_settings_vault/shared/infrastructure/vault_http.py`, `pydantic2_settings_vault/features/settings_source/source.py`, `tests/`, `README.md`
@@ -229,6 +229,21 @@ Support long-running applications that need to keep Vault authentication healthy
 - [ ] Document when renewal is useful versus when one-time startup loading is enough
 
 **Potential files:** `pydantic2_settings_vault/__init__.py`, `pydantic2_settings_vault/auth/`
+
+### 15. HashiCorp Vault Enterprise support
+
+**Status:** Done
+
+Support [HashiCorp Vault Enterprise](https://www.hashicorp.com/products/vault) deployments alongside Vault OSS. Enterprise-specific behavior is opt-in via configuration so OSS users are unaffected.
+
+- [x] Read optional `VAULT_NAMESPACE` from environment variables
+- [x] Send `X-Vault-Namespace` header on AppRole authentication requests
+- [x] Send `X-Vault-Namespace` header on secret read requests
+- [x] Accept `vault_namespace` override in `validate_vault_configuration`
+- [ ] Add automated tests for namespace header behavior
+- [ ] Document OSS vs Enterprise setup (`VAULT_NAMESPACE`) in `README.md`
+
+**Key files:** `pydantic2_settings_vault/shared/infrastructure/vault_http.py`, `pydantic2_settings_vault/features/settings_source/source.py`, `pydantic2_settings_vault/features/settings_source/validation.py`, `README.md`
 
 ---
 
