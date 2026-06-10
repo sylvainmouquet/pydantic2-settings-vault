@@ -1,0 +1,221 @@
+---
+
+description: Enforce Documentation and GitHub Publishing
+globs:
+
+* "**/*"
+  alwaysApply: true
+
+---
+
+# Documentation Policy
+
+## Objective
+
+Every project must maintain comprehensive documentation that is:
+
+* Version controlled
+* Kept up to date with the codebase
+* Reviewable in pull requests
+* Published through GitHub
+
+Documentation is a first-class deliverable and must evolve with the software.
+
+## Required Documentation
+
+The repository must contain at least:
+
+```text
+README.md
+SPECS.md
+CHANGELOG.md
+docs/
+```
+
+### README.md
+
+Must contain:
+
+* Project overview
+* Features
+* Installation instructions
+* Quick start guide
+* Development commands
+* Testing instructions
+* Documentation links
+
+### SPECS.md
+
+Must contain:
+
+* Product vision
+* Feature status
+* Roadmap
+* Architecture notes
+
+### CHANGELOG.md
+
+Must follow a structured changelog format.
+
+At minimum:
+
+```md
+## Unreleased
+
+### Added
+### Changed
+### Fixed
+### Removed
+```
+
+### docs/
+
+The `docs/` directory contains long-form documentation.
+
+Examples:
+
+```text
+docs/
+├── architecture.md
+├── development.md
+├── deployment.md
+├── testing.md
+├── api/
+└── decisions/
+```
+
+## Documentation Ownership
+
+Every feature should include documentation.
+
+Examples:
+
+```text
+features/
+└── search/
+    ├── README.md
+    ├── implementation/
+    └── tests/
+```
+
+or
+
+```text
+features/
+└── billing/
+    ├── SPECS.md
+    ├── README.md
+    └── source/
+```
+
+Feature documentation should describe:
+
+* Purpose
+* Architecture
+* Public interfaces
+* Constraints
+* Known limitations
+
+## Pull Requests
+
+When behavior changes:
+
+* Update the relevant documentation.
+* Update examples if necessary.
+* Update architecture documentation if impacted.
+
+Code changes without documentation updates should be considered incomplete.
+
+## API Documentation
+
+Public APIs must be documented.
+
+Preferred sources:
+
+* Rust doc comments
+* Swift DocC
+* Python docstrings
+* TypeScript TSDoc
+* Java/Kotlin Javadoc
+
+Documentation should be generated automatically whenever possible.
+
+## GitHub Publishing
+
+Documentation must be exposed through GitHub.
+
+Preferred options:
+
+1. GitHub Pages
+2. Generated documentation artifacts
+3. Repository-hosted docs
+
+### GitHub Pages
+
+Preferred structure:
+
+```text
+docs/
+```
+
+Published automatically using GitHub Actions.
+
+Examples:
+
+* MkDocs
+* Docusaurus
+* DocC
+* Sphinx
+* mdBook
+
+### GitHub Actions
+
+CI should:
+
+1. Validate documentation builds.
+2. Generate documentation.
+3. Publish documentation automatically.
+4. Fail if documentation generation fails.
+
+## Architecture Documentation
+
+The project should maintain:
+
+```text
+docs/architecture.md
+```
+
+Including:
+
+* System overview
+* Major components
+* Dependencies
+* Data flow
+* Architectural decisions
+
+## Decision Records
+
+Significant decisions should be recorded as ADRs.
+
+```text
+docs/decisions/
+├── 0001-feature-based-architecture.md
+├── 0002-use-justfile.md
+└── 0003-ci-coverage-policy.md
+```
+
+## Documentation Quality
+
+Documentation should:
+
+* Be written in Markdown
+* Be concise
+* Include examples
+* Be updated with the implementation
+* Be discoverable from README.md
+
+## Rule of Thumb
+
+If a developer needs to understand it, operate it, extend it, or debug it, it should be documented.
+
+If a feature exists, documentation should exist.

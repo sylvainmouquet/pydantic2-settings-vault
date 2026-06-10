@@ -1,6 +1,6 @@
 [project]
 name = "pydantic2-settings-vault"
-version = "0.0.1"
+version = "2.0.0"
 description = "A Pydantic v2 settings extension for secure configuration management using HashiCorp Vault OpenSource (OSS) and Enterprise"
 authors = [{name = "Sylvain Mouquet", email = "sylvain.mouquet@gmail.com"}]
 readme = "README.md"

@@ -1,0 +1,157 @@
+---
+
+description: Enforce Feature-Based Architecture
+globs:
+
+* "**/*"
+  alwaysApply: true
+
+---
+
+# Feature-Based Architecture
+
+This repository follows a Feature-Based Code Organization.
+
+## Core Principle
+
+Organize code by business capability (feature) rather than by technical layer.
+
+A feature should contain everything required for its implementation:
+
+* UI
+* Domain logic
+* Services
+* Models
+* Persistence
+* Tests
+* Documentation
+
+## Preferred Structure
+
+```text
+src/
+├── features/
+│   ├── authentication/
+│   ├── billing/
+│   ├── search/
+│   ├── notifications/
+│   └── settings/
+│
+├── shared/
+│   ├── infrastructure/
+│   ├── persistence/
+│   ├── networking/
+│   ├── design-system/
+│   └── utilities/
+│
+└── app/
+```
+
+## Avoid Layer-Based Organization
+
+Avoid structures such as:
+
+```text
+src/
+├── controllers/
+├── services/
+├── models/
+├── repositories/
+├── views/
+└── utils/
+```
+
+These structures scale poorly because unrelated features become tightly coupled.
+
+## File Placement Rules
+
+New code must be placed inside the feature that owns the behavior.
+
+Examples:
+
+* Authentication logic → `features/authentication/`
+* Billing logic → `features/billing/`
+* Search logic → `features/search/`
+
+Do not create global folders for feature-specific code.
+
+## Shared Code
+
+Code belongs in `shared/` only if:
+
+1. It is used by multiple features.
+2. It has no business-specific behavior.
+3. It can be reused without knowledge of a particular feature.
+
+Examples:
+
+```text
+shared/
+├── networking/
+├── database/
+├── logging/
+├── configuration/
+└── utilities/
+```
+
+## Tests
+
+Tests should live close to the feature they validate.
+
+```text
+features/
+└── search/
+    ├── implementation/
+    ├── tests/
+    └── docs/
+```
+
+or
+
+```text
+features/
+└── search/
+    ├── search.py
+    └── test_search.py
+```
+
+depending on language conventions.
+
+## Documentation
+
+Feature-specific documentation should live inside the feature folder.
+
+```text
+features/
+└── billing/
+    ├── SPECS.md
+    ├── README.md
+    └── implementation/
+```
+
+## Refactoring Guidance
+
+When modifying code:
+
+* Prefer moving code toward the owning feature.
+* Avoid introducing new global layer folders.
+* Keep dependencies localized.
+* Minimize cross-feature coupling.
+* Preserve clear feature boundaries.
+
+## Language Independence
+
+This rule applies equally to:
+
+* Swift
+* Python
+* Rust
+* TypeScript
+* JavaScript
+* Kotlin
+* Java
+* Go
+* C#
+* PHP
+
+The organization principle remains the same regardless of language or framework.

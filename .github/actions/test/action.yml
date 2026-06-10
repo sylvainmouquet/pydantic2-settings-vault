@@ -1,4 +1,5 @@
 name: Run Tests
+description: Install dependencies, build the package, and run tests.
 
 runs:
   using: 'composite'
@@ -13,16 +14,18 @@ runs:
         python-version: ${{ matrix.python-version }}
     - name: Install uv
       uses: astral-sh/setup-uv@v2
+    - name: Install just
+      uses: extractions/setup-just@v3
     - name: Use uv with Python version
       run: uv venv --python ${{ matrix.python-version }}
       shell: bash
     - name: Install dependencies
-      run: make install
+      run: just install
       shell: bash
     - name: Build
       env:
         VERSION: 0.0.1
-      run: make build
+      run: just build
       shell: bash
     - name: Run tests
       run: |
@@ -50,7 +53,7 @@ runs:
           Test-Connection -ComputerName host.docker.internal -Count 2
         fi
         
-        make test
+        just test
       shell: bash
       env:
         PYTHON_VERSION: ${{ matrix.python-version }}

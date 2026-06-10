@@ -1,0 +1,137 @@
+---
+
+description: Enforce Test Coverage and CI Reporting
+globs:
+
+* "**/*"
+  alwaysApply: true
+
+---
+
+# Test Coverage Policy
+
+## Objective
+
+The target test coverage for this project is **100%**.
+
+All production code should be covered by automated tests.
+
+## Requirements
+
+Every new feature must include:
+
+* Unit tests
+* Integration tests when applicable
+* Regression tests for bug fixes
+* Edge case coverage
+* Error path coverage
+
+Code should not be considered complete without tests.
+
+## Coverage Enforcement
+
+Changes should maintain or improve overall coverage.
+
+Avoid:
+
+* Untested business logic
+* Untested error handling
+* Untested public APIs
+* Untested feature behavior
+
+## Pull Requests
+
+Every pull request should:
+
+1. Add tests for new functionality.
+2. Update tests impacted by behavior changes.
+3. Keep coverage at or above the project's target.
+
+## CI/CD
+
+Coverage must be executed automatically in GitHub Actions.
+
+CI should:
+
+1. Run all tests.
+2. Generate a coverage report.
+3. Fail if coverage drops below the configured threshold.
+4. Publish coverage results for visibility.
+
+## GitHub Integration
+
+Coverage results should be exposed through GitHub using one of:
+
+* GitHub Actions summaries
+* Coverage comments on pull requests
+* Coverage badges
+* Codecov
+* Coveralls
+* Native GitHub reporting
+
+Preferred order:
+
+1. GitHub Actions summary
+2. Pull Request comment
+3. Coverage badge
+
+## Language-Specific Coverage Tools
+
+Use the standard coverage tooling for the language:
+
+### Swift
+
+* XCTest
+* xccov
+* llvm-cov
+
+### Rust
+
+* cargo-llvm-cov
+
+### Python
+
+* pytest
+* pytest-cov
+
+### TypeScript / JavaScript
+
+* Vitest
+* Jest
+* c8
+* Istanbul
+
+### Go
+
+* go test -cover
+
+### Java / Kotlin
+
+* JaCoCo
+
+### C#
+
+* Coverlet
+
+## CI Expectations
+
+When creating CI workflows:
+
+* Coverage collection must be enabled.
+* Coverage reports must be uploaded as artifacts.
+* Coverage summaries should be visible directly in GitHub.
+* Pull requests should expose coverage changes whenever possible.
+
+## Bug Fixes
+
+Every bug fix must include a test reproducing the bug before the fix.
+
+The fix is not complete until the test passes.
+
+## Rule of Thumb
+
+If code can fail, it should have a test.
+
+If behavior matters, it should have a test.
+
+If a bug existed before, a regression test must prevent it from returning.

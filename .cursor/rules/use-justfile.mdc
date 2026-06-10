@@ -1,0 +1,110 @@
+---
+
+description: Prefer Justfile over Makefile
+globs:
+
+* "**/*"
+  alwaysApply: true
+
+---
+
+# Build & Task Runner Convention
+
+This project uses **Just** (`justfile`) as the task runner.
+
+## Rule
+
+Always prefer a `justfile` over a `Makefile`.
+
+When creating, modifying, or documenting project commands:
+
+* Use `justfile`
+* Do not introduce a new `Makefile`
+* Do not suggest Make targets unless explicitly requested
+* Prefer `just <recipe>` syntax in documentation and examples
+
+## Examples
+
+Preferred:
+
+```bash
+just build
+just test
+just lint
+just format
+just run
+```
+
+Avoid:
+
+```bash
+make build
+make test
+make lint
+make format
+make run
+```
+
+## Creating Automation
+
+When a task runner is needed, add or update the project's `justfile`.
+
+Example:
+
+```just
+build:
+    cargo build
+
+test:
+    cargo test
+
+lint:
+    cargo clippy
+
+run:
+    cargo run
+```
+
+## Documentation
+
+When writing:
+
+* README.md
+* CONTRIBUTING.md
+* AGENTS.md
+* SPECS.md
+* setup guides
+
+Always document commands using `just`.
+
+Example:
+
+````md
+## Development
+
+```bash
+just install
+just test
+just run
+````
+
+```
+
+## Migration Guidance
+
+If a Makefile already exists:
+
+- Prefer migrating tasks to a `justfile`
+- Reference the `justfile` as the source of truth
+- Avoid adding new Make targets
+
+## Exceptions
+
+A Makefile may only be used when:
+
+1. The user explicitly requests a Makefile.
+2. A third-party tool strictly requires one.
+3. Backward compatibility is mandatory.
+
+In all other cases, use a `justfile`.
+```

@@ -24,6 +24,9 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v2
 
+      - name: Install just
+        uses: extractions/setup-just@v3
+
       - name: Use uv with Python version
         run: uv venv --python 3.13
 
@@ -33,25 +36,25 @@ jobs:
       - name: Save check dependencies output (before)
         id: check_deps_before
         run: |
-          BEFORE=$(make check-deps) || true
+          BEFORE=$(just check-deps) || true
           echo "BEFORE=${BEFORE}"
 
-          echo "BEFORE<<EOF" >> $GITHUB_ENV
-          echo "$BEFORE" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          echo "before<<EOF" >> $GITHUB_OUTPUT
+          echo "$BEFORE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Run make update
-        run: make update
+      - name: Run just update
+        run: just update
 
-      - name: Run make check dependencies (after)
+      - name: Run just check dependencies (after)
         id: check_deps_after
         run: |
-          after=$(make check-deps) || true
+          AFTER=$(just check-deps) || true
           echo "AFTER=${AFTER}"
 
-          echo "AFTER<<EOF" >> $GITHUB_ENV
-          echo "$AFTER" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          echo "after<<EOF" >> $GITHUB_OUTPUT
+          echo "$AFTER" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create or Update Pull Request
         uses: peter-evans/create-pull-request@v7
@@ -61,10 +64,10 @@ jobs:
             Automated update of uv.lock
             
             **Before:** 
-            ${{env.BEFORE}}
+            ${{ steps.check_deps_before.outputs.before }}
             
             **After:**
-            ${{env.AFTER}}
+            ${{ steps.check_deps_after.outputs.after }}
           base: main
           branch: update-python-dependencies
           
