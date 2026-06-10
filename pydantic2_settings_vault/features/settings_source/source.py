@@ -100,7 +100,9 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
                     field_name=_fieldname, field=field
                 )
                 field_metadata = field.json_schema_extra
-                metadata_dict = field_metadata if isinstance(field_metadata, dict) else {}
+                metadata_dict = (
+                    field_metadata if isinstance(field_metadata, dict) else {}
+                )
                 kv_version = resolve_kv_version(
                     metadata_dict,
                     default=default_kv_version,

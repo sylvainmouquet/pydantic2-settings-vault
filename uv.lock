@@ -2059,6 +2059,7 @@ dependencies = [
     { name = "aiohttp" },
     { name = "certifi" },
     { name = "concurrency-limiter" },
+    { name = "cryptography" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "reattempt" },
@@ -2093,6 +2094,7 @@ oci = [
 dev = [
     { name = "anyio" },
     { name = "asyncpg" },
+    { name = "botocore" },
     { name = "loguru" },
     { name = "pip" },
     { name = "pycontainers" },
@@ -2115,6 +2117,7 @@ requires-dist = [
     { name = "botocore", marker = "extra == 'cloud'", specifier = ">=1.35.0" },
     { name = "certifi", specifier = ">=2025.1.31" },
     { name = "concurrency-limiter", specifier = ">=1.1.0" },
+    { name = "cryptography", specifier = ">=46.0.7" },
     { name = "cryptography", marker = "extra == 'cf'", specifier = ">=43.0.0" },
     { name = "google-auth", marker = "extra == 'cloud'", specifier = ">=2.35.0" },
     { name = "google-auth", marker = "extra == 'gcp'", specifier = ">=2.35.0" },
@@ -2132,6 +2135,7 @@ provides-extras = ["aws", "gcp", "azure", "oci", "cf", "cloud"]
 dev = [
     { name = "anyio", specifier = ">=4.6.2.post1" },
     { name = "asyncpg", specifier = ">=0.30.0" },
+    { name = "botocore" },
     { name = "loguru", specifier = ">=0.7.2" },
     { name = "pip", specifier = ">=24.2" },
     { name = "pycontainers", directory = "../pycontainers" },

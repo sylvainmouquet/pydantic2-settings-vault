@@ -4,7 +4,9 @@ import pytest
 from pydantic import Field, SecretStr
 from pydantic_core._pydantic_core import ValidationError
 
-from pydantic2_settings_vault.features.settings_source.source import VaultConfigSettingsSource
+from pydantic2_settings_vault.features.settings_source.source import (
+    VaultConfigSettingsSource,
+)
 from test.features.settings_source.settings import (
     AppSettings,
     InvalidAppSettings,
@@ -46,6 +48,7 @@ def configure_token_auth(monkeypatch) -> None:
     monkeypatch.setenv("VAULT_TOKEN", "root-token")
     monkeypatch.delenv("VAULT_ROLE_ID", raising=False)
     monkeypatch.delenv("VAULT_SECRET_ID", raising=False)
+    monkeypatch.delenv("VAULT_KV_VERSION", raising=False)
 
 
 def test_get_field_vault_metadata_requires_path_and_key():
@@ -70,7 +73,10 @@ def test_prepare_field_value_returns_value_unchanged():
     source = VaultConfigSettingsSource(settings_cls=ValidAppSettings)
     field = ValidAppSettings.model_fields["FOO"]
 
-    assert source.prepare_field_value("FOO", field, "secret-value", False) == "secret-value"
+    assert (
+        source.prepare_field_value("FOO", field, "secret-value", False)
+        == "secret-value"
+    )
 
 
 def test_source_loads_mapped_secret_from_mocked_vault(mocker, monkeypatch):
@@ -169,3 +175,56 @@ def test_source_raises_for_incomplete_field_metadata(monkeypatch):
 
     with pytest.raises(ValueError, match="vault_secret_key"):
         IncompleteMetadataSettings()  # type: ignore
+
+
+class LogicalPathAppSettings(AppSettings):
+    FOO: SecretStr = Field(
+        ...,
+        json_schema_extra={
+            "vault_secret_path": "secret/test",
+            "vault_secret_key": "FOO",
+        },
+    )
+
+
+class Kv1FieldAppSettings(AppSettings):
+    FOO: SecretStr = Field(
+        ...,
+        json_schema_extra={
+            "vault_secret_path": "legacy/test",
+            "vault_secret_key": "FOO",
+            "vault_kv_version": 1,
+        },
+    )
+
+
+def test_source_normalizes_logical_kv2_path(mocker, monkeypatch):
+    configure_token_auth(monkeypatch)
+    vault_instance = patch_internal_http_vault(
+        mocker,
+        secrets={"FOO": SecretStr("BAR")},
+    )
+
+    settings = LogicalPathAppSettings()  # type: ignore
+
+    assert settings.FOO.get_secret_value() == "BAR"
+    vault_instance.get_secrets.assert_awaited_once_with(
+        vault_path="secret/data/test",
+        kv_version=2,
+    )
+
+
+def test_source_uses_per_field_kv_version(mocker, monkeypatch):
+    configure_token_auth(monkeypatch)
+    vault_instance = patch_internal_http_vault(
+        mocker,
+        secrets={"FOO": SecretStr("BAR")},
+    )
+
+    settings = Kv1FieldAppSettings()  # type: ignore
+
+    assert settings.FOO.get_secret_value() == "BAR"
+    vault_instance.get_secrets.assert_awaited_once_with(
+        vault_path="legacy/test",
+        kv_version=1,
+    )

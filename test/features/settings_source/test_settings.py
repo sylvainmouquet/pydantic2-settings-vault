@@ -132,15 +132,22 @@ async def test_valid_get_secret_with_kv_v1_mount(
     credentials = vault_container.execute(["cat", "/vault-credentials.env"])
     credentials_dict = parse_vault_credentials(credentials)
     configure_vault_token_env(vault_container, credentials_dict)
+    previous_kv_version = os.environ.get("VAULT_KV_VERSION")
     os.environ["VAULT_KV_VERSION"] = "1"
     os.environ["VAULT_TOKEN"] = VAULT_DEV_ROOT_TOKEN
 
-    vault_container.execute(
-        ["vault", "secrets", "enable", "-path=secretv1", "-version=1", "kv"],
-    )
-    vault_container.execute(
-        ["vault", "kv", "put", "-mount=secretv1", "test", "FOO=BAR"],
-    )
+    try:
+        vault_container.execute(
+            ["vault", "secrets", "enable", "-path=secretv1", "-version=1", "kv"],
+        )
+        vault_container.execute(
+            ["vault", "kv", "put", "-mount=secretv1", "test", "FOO=BAR"],
+        )
 
-    settings = Kv1AppSettings()  # type: ignore
-    assert settings.FOO.get_secret_value() == "BAR"
+        settings = Kv1AppSettings()  # type: ignore
+        assert settings.FOO.get_secret_value() == "BAR"
+    finally:
+        if previous_kv_version is None:
+            os.environ.pop("VAULT_KV_VERSION", None)
+        else:
+            os.environ["VAULT_KV_VERSION"] = previous_kv_version

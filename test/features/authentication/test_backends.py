@@ -109,13 +109,21 @@ def test_aws_auth_backend_generates_signed_payload(monkeypatch):
     monkeypatch.delenv("VAULT_AWS_IAM_REQUEST_BODY", raising=False)
     monkeypatch.delenv("VAULT_AWS_IAM_REQUEST_HEADERS", raising=False)
     monkeypatch.setenv("VAULT_AWS_IAM_SERVER_ID", "vault.example.com")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
 
-    botocore = pytest.importorskip("botocore")
+    pytest.importorskip("botocore")
+    import botocore.session
+
     session = botocore.session.get_session()
     client = session.create_client("sts")
     endpoint = client._endpoint
     operation_model = client._service_model.operation_model("GetCallerIdentity")
-    request_dict = client._convert_to_request_dict({}, operation_model)
+    request_dict = client._convert_to_request_dict(
+        {},
+        operation_model,
+        client.meta.endpoint_url,
+    )
     request_dict["headers"]["X-Vault-AWS-IAM-Server-ID"] = "vault.example.com"
     request = endpoint.create_request(request_dict, operation_model)
 

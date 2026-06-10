@@ -1,5 +1,5 @@
 import os
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 KVVersion = Literal[1, 2]
 VAULT_KV_VERSION_ENV_VAR = "VAULT_KV_VERSION"
@@ -9,12 +9,14 @@ SUPPORTED_KV_VERSIONS: frozenset[int] = frozenset({1, 2})
 
 def _validate_kv_version(kv_version: int) -> KVVersion:
     if kv_version not in SUPPORTED_KV_VERSIONS:
-        supported_versions = ", ".join(str(version) for version in sorted(SUPPORTED_KV_VERSIONS))
+        supported_versions = ", ".join(
+            str(version) for version in sorted(SUPPORTED_KV_VERSIONS)
+        )
         raise ValueError(
             f"Unsupported Vault KV version {kv_version!r}. "
             f"Supported versions: {supported_versions}."
         )
-    return kv_version
+    return cast(KVVersion, kv_version)
 
 
 def resolve_kv_version_from_env() -> KVVersion:
@@ -72,7 +74,9 @@ def normalize_kv_path(vault_path: str, kv_version: int) -> str:
     return vault_path
 
 
-def extract_kv_secret_data(response_json: dict[str, Any], kv_version: int) -> dict[str, Any]:
+def extract_kv_secret_data(
+    response_json: dict[str, Any], kv_version: int
+) -> dict[str, Any]:
     """Extract the key/value map from a Vault KV read response."""
     validated_version = _validate_kv_version(kv_version)
     data = response_json.get("data")

@@ -10,7 +10,10 @@ from pydantic2_settings_vault.features.authentication.backends import (
 )
 from pydantic2_settings_vault.shared.infrastructure import vault_http
 from pydantic2_settings_vault.shared.infrastructure.vault_http import InternalHttpVault
-from test.features.shared.vault_mocks import mock_aiohttp_response, mock_vault_http_session
+from test.features.shared.vault_mocks import (
+    mock_aiohttp_response,
+    mock_vault_http_session,
+)
 
 
 @pytest.mark.asyncio

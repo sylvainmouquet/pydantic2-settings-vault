@@ -56,6 +56,8 @@ class InvalidKvVersionTypeSettings(AppSettings):
 
 
 def test_validate_reports_missing_env_vars(monkeypatch):
+    monkeypatch.delenv("VAULT_AUTH_METHOD", raising=False)
+    monkeypatch.delenv("VAULT_TOKEN", raising=False)
     monkeypatch.delenv("VAULT_ROLE_ID", raising=False)
     monkeypatch.delenv("VAULT_SECRET_ID", raising=False)
 
@@ -183,6 +185,8 @@ async def test_validate_auth_check_reports_failure(
 
 
 def test_validate_skips_auth_check_when_env_vars_missing(monkeypatch):
+    monkeypatch.delenv("VAULT_AUTH_METHOD", raising=False)
+    monkeypatch.delenv("VAULT_TOKEN", raising=False)
     monkeypatch.delenv("VAULT_ROLE_ID", raising=False)
     monkeypatch.delenv("VAULT_SECRET_ID", raising=False)
 

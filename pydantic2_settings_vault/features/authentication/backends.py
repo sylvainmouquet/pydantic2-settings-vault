@@ -194,13 +194,20 @@ class AwsAuthBackend(VaultAuthBackend):
         client = session.create_client("sts")
         endpoint = client._endpoint
         operation_model = client._service_model.operation_model("GetCallerIdentity")
-        request_dict = client._convert_to_request_dict({}, operation_model)
+        request_dict = client._convert_to_request_dict(
+            {},
+            operation_model,
+            client.meta.endpoint_url,
+        )
 
         if iam_server_id:
             request_dict["headers"]["X-Vault-AWS-IAM-Server-ID"] = iam_server_id
 
         request = endpoint.create_request(request_dict, operation_model)
-        headers = {key: [value] for key, value in dict(request.headers).items()}
+        headers = {
+            key: [value.decode() if isinstance(value, bytes) else value]
+            for key, value in dict(request.headers).items()
+        }
 
         payload = {
             "role": role,
