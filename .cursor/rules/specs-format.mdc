@@ -1,0 +1,75 @@
+---
+
+description: Enforce SPECS.md product specification format
+globs:
+
+* "SPECS.md"
+  alwaysApply: true
+
+---
+
+# SPECS.md formatting rule
+
+When editing `SPECS.md`, always preserve the product specification structure and style below.
+
+## Required structure
+
+The file must start with:
+
+```md
+# <Project name> — Product Specification
+
+<Description>
+```
+
+Then keep this section order:
+
+1. `## High impact, relatively simple`
+2. `## Medium impact — broadens scope`
+3. `## Polish & UX`
+4. `## New Opportunities`
+5. `## Recommended Roadmap`
+6. `## Architecture notes`
+
+## Feature entry format
+
+Each feature must use this format:
+
+```md
+### <number>. <Feature name>
+
+**Status:** <Done | Planned | Planned (Long Term)>
+
+<Short description>
+
+- [x] Completed item
+- [ ] Planned item
+
+**Key files:** `File.swift`, `OtherFile.swift`
+```
+
+Use `**Potential files:**` instead of `**Key files:**` for planned features.
+
+## Style rules
+
+* Keep feature numbering sequential.
+* Use English headings and descriptions unless the existing feature text is already French.
+* Use `**Status:** Done` for completed features.
+* Use `**Status:** Planned` for future features.
+* Use checked tasks `- [x]` only for completed work.
+* Use unchecked tasks `- [ ]` only for planned work.
+* Separate major sections and feature entries with `---` only where already used in the document.
+* Keep examples in fenced code blocks with the correct language, such as `text` or `swift`.
+* Keep file names wrapped in backticks.
+* Do not replace the document with a short summary.
+* Do not remove roadmap or architecture notes when adding features.
+
+## Update behavior
+
+When asked to add or update a feature:
+
+1. Place it in the most appropriate existing section.
+2. Preserve the existing tone and level of detail.
+3. Add or update `Key files` / `Potential files`.
+4. Update the roadmap only if the user explicitly asks or the change clearly affects release planning.
+5. Keep completed features in their current historical format instead of rewriting them aggressively.

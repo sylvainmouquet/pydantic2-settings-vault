@@ -41,8 +41,8 @@ changelog = "https://github.com/sylvainmouquet/pydantic2-settings-vault/releases
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "anyio>=4.6.2.post1",
     "asyncpg>=0.30.0",
     "loguru>=0.7.2",
