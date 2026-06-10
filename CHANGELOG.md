@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Official Python 3.14 support: PyPI classifier, CI matrix entry, release workflow, and local development default (`.python-version`, `just test` / `just coverage`).
+
 - MkDocs Material user documentation site with GitHub Pages deployment (`mkdocs.yml`, `just docs-serve`, `just docs-build`, CI workflow).
 - User guides: [Authentication](docs/authentication.md) and [Advanced configuration](docs/advanced-configuration.md).
 - `VaultClientConfig` to tune Vault HTTP timeouts, retry backoff, and secret-fetch concurrency on `VaultConfigSettingsSource`, with `for_local()`, `for_ci()`, and `for_production()` presets.

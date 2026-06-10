@@ -2,6 +2,8 @@
 
 **pydantic2-settings-vault** extends [Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) to load secrets from [HashiCorp Vault](https://www.hashicorp.com/products/vault) (OSS and Enterprise). Annotate fields with Vault path metadata, authenticate with your preferred auth method, and let Pydantic validate the result.
 
+Requires **Python 3.10+** (tested on 3.10 through 3.14).
+
 ## Installation
 
 === "pip"

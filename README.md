@@ -33,6 +33,10 @@ uv
 uv add pydantic2-settings-vault
 ```
 
+## Requirements
+
+Python **3.10** through **3.14** (`requires-python = ">=3.10"`). CI runs the full test suite on 3.10, 3.11, 3.12, 3.13, and 3.14.
+
 ## Documentation
 
 User documentation is published with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/):

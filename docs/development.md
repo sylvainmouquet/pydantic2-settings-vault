@@ -4,6 +4,7 @@ For usage examples, field annotations, and Vault policy setup, see the [user doc
 
 ## Prerequisites
 
+- Python 3.10–3.14 (local development defaults to 3.14 via `.python-version`)
 - [uv](https://docs.astral.sh/uv/)
 - [just](https://github.com/casey/just/)
 
@@ -55,4 +56,10 @@ Run the full suite including integration tests:
 
 ```bash
 just test
+```
+
+Run against a specific Python version (CI tests 3.10 through 3.14):
+
+```bash
+PYTHON_VERSION=3.13 just test
 ```

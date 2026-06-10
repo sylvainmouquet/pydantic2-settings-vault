@@ -268,6 +268,7 @@ Support [HashiCorp Vault Enterprise](https://www.hashicorp.com/products/vault) d
 
 ## Architecture notes
 
+- Supported Python versions: 3.10, 3.11, 3.12, 3.13, and 3.14 (CI matrix); local development defaults to 3.14
 - Task runner: [Just](https://github.com/casey/just) (`justfile`) — use `just install`, `just test`, `just lint`, `just format`, and `just check` for local development
 - Single settings source class: `VaultConfigSettingsSource`
 - Vault API coordination: `InternalHttpVault`
