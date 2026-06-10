@@ -1,10 +1,54 @@
-# Pydantic2-Settings-Vault
-
-Pydantic2-Settings-Vault is a simple extension of Pydantic Settings to collect secrets from HashiCorp Vault OpenSource (OSS) and Enterprise
+![license](https://img.shields.io/pypi/l/pydantic2-settings-vault?style=for-the-badge) ![python version](https://img.shields.io/pypi/pyversions/pydantic2-settings-vault?style=for-the-badge) [![version](https://img.shields.io/pypi/v/pydantic2-settings-vault?style=for-the-badge)](https://pypi.org/project/pydantic2-settings-vault/) [![](https://img.shields.io/pypi/dm/pydantic2-settings-vault?style=for-the-badge)](https://pypi.org/project/pydantic2-settings-vault/)
 
 
-### Demonstration:
+# pydantic2-settings-vault
 
+Simple extension of [pydantic_settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) to collect secrets in [HashiCorp Vault](https://www.hashicorp.com/fr/products/vault) OpenSource (OSS) and Enterprise
+
+__pydantic2-settings-vault__ is a extension for Pydantic Settings that enables secure configuration management by integrating with __HashiCorp Vault__. This library supports both the open-source (OSS) and Enterprise versions of Vault, providing a seamless way to retrieve and manage secrets within your Pydantic-based applications. By leveraging Vault's robust security features, __pydantic2-settings-vault__ allows developers to easily incorporate secure secret management practices into their Python projects, enhancing overall application security and simplifying the handling of sensitive configuration data.
+
+  - [Installation](#installation)
+  - [Demonstration](#demonstration)
+  - [License](#license)
+  - [Contact](#contact)
+
+## Installation
+
+pip
+
+```bash
+pip install pydantic2-settings-vault
+```
+poetry
+
+```bash
+poetry add pydantic2-settings-vault
+```
+
+uv
+
+```bash
+uv add pydantic2-settings-vault
+```
+
+### Getting started
+
+Create a class __AppSettings__ that inherit of __BaseSettings__ . 
+
+Create a field for each vault secret. 
+
+ex: 
+```python
+MY_SECRET: SecretStr = Field(
+        ...,
+        json_schema_extra={
+            "vault_secret_path": "secret/data/test",
+            "vault_secret_key": "FOO",  # pragma: allowlist secret
+        },
+    )
+```
+
+#### Full example
 ```python
 from functools import lru_cache
 from threading import Lock
@@ -39,7 +83,7 @@ class AppSettings(BaseSettings):
             init_settings,
             env_settings,
             dotenv_settings,
-            VaultConfigSettingsSource(settings_cls=settings_cls),
+            VaultConfigSettingsSource(settings_cls=settings_cls), #   add this line
         )
 
 # The connection to Vault is done via HTTPS with AppRole authentication
@@ -82,27 +126,7 @@ sequenceDiagram
     B->>A: settings with variables and secrets
 ```
 
-## Table of Contents
 
-- [Pydantic2-Settings-Vault](#Pydantic2-Settings-Vault)
-  - [Table of Contents](#table-of-contents)
-  - [Description](#description)
-  - [Installation](#installation)
-  - [License](#license)
-  - [Contact](#contact)
-
-## Description
-
-Pydantic2-Settings-Vault is a extension for Pydantic Settings that enables secure configuration management by integrating with HashiCorp Vault. This library supports both the open-source (OSS) and Enterprise versions of Vault, providing a seamless way to retrieve and manage secrets within your Pydantic-based applications. By leveraging Vault's robust security features, Pydantic2-Settings-Vault allows developers to easily incorporate secure secret management practices into their Python projects, enhancing overall application security and simplifying the handling of sensitive configuration data.
-
-## Installation
-
-```bash
-# Install the dependency
-pip install pydantic2-settings-vault
-uv add pydantic2-settings-vault
-poetry add pydantic2-settings-vault
-```
 
 ## License
 
