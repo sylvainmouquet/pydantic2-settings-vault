@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `VaultClientConfig` to tune Vault HTTP timeouts, retry backoff, and secret-fetch concurrency on `VaultConfigSettingsSource`, with `for_local()`, `for_ci()`, and `for_production()` presets.
+- Optional in-memory Vault secret cache via `VaultConfigSettingsSource(cache_enabled=True, cache_ttl_seconds=...)`, or an explicit `VaultSecretCache` instance passed as `secret_cache`. Cache is disabled by default.
+- `VaultSecretCache` public type for shared, TTL-based secret caching across repeated settings loads.
 - KV secrets engine version selection via `VAULT_KV_VERSION` (default `2`) and per-field `vault_kv_version` metadata.
 - KV path normalization for v1 and v2 (`secret/test` → `secret/data/test` for KV v2 reads).
 - Vault KV policies, path conventions, and field-mapping guidance in `docs/vault-kv-and-policies.md`.

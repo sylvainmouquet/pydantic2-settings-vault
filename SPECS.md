@@ -42,11 +42,11 @@ Discovers which Pydantic fields require a Vault secret and maps them to the corr
 
 Fetches all needed secrets in parallel using `asyncio.gather` and a custom concurrency limiter.
 
-- [x] Concurrency controlled by `concurrency_limiter`, max 5 concurrent requests
+- [x] Concurrency controlled by `concurrency_limiter` (default max 5 concurrent requests, configurable via `VaultClientConfig`)
 - [x] Async workflows wrapped to run safely inside a thread executor
-- [x] All Vault requests are retried using the `reattempt` decorator in case of transient failure
+- [x] All Vault requests are retried using the `reattempt` decorator in case of transient failure (configurable via `VaultClientConfig`)
 
-**Key files:** `pydantic2_settings_vault/__init__.py`
+**Key files:** `pydantic2_settings_vault/features/settings_source/source.py`, `pydantic2_settings_vault/shared/infrastructure/vault_client_config.py`
 
 ---
 
@@ -151,29 +151,29 @@ Provide practical usage examples for configuring settings models, annotating fie
 
 ### 9. Configurable Vault client controls
 
-**Status:** Planned
+**Status:** Done
 
 Let applications tune Vault request behavior for different runtime environments without modifying package internals.
 
-- [ ] Add configurable request timeout values
-- [ ] Add configurable retry attempts and retry delay strategy
-- [ ] Expose concurrency limit as a settings-source option
-- [ ] Document recommended defaults for local, CI, and production usage
+- [x] Add configurable request timeout values
+- [x] Add configurable retry attempts and retry delay strategy
+- [x] Expose concurrency limit as a settings-source option
+- [x] Document recommended defaults for local, CI, and production usage
 
-**Potential files:** `pydantic2_settings_vault/__init__.py`, `README.md`
+**Key files:** `pydantic2_settings_vault/shared/infrastructure/vault_client_config.py`, `pydantic2_settings_vault/features/settings_source/source.py`, `pydantic2_settings_vault/shared/infrastructure/vault_http.py`, `README.md`
 
 ### 10. Secret cache and duplicate request reduction
 
-**Status:** Planned
+**Status:** Done
 
 Reduce repeated Vault calls when multiple fields reference the same path/key or when settings are initialized repeatedly in short-lived application flows.
 
-- [ ] Deduplicate requests for identical Vault path/key pairs during one settings load
-- [ ] Add optional in-memory cache with a configurable TTL
-- [ ] Keep cache disabled by default unless the caller opts in
-- [ ] Add tests proving cached values do not bypass Pydantic validation
+- [x] Deduplicate requests for identical Vault path/key pairs during one settings load
+- [x] Add optional in-memory cache with a configurable TTL
+- [x] Keep cache disabled by default unless the caller opts in
+- [x] Add tests proving cached values do not bypass Pydantic validation
 
-**Potential files:** `pydantic2_settings_vault/__init__.py`, `tests/`
+**Key files:** `pydantic2_settings_vault/features/settings_source/cache.py`, `pydantic2_settings_vault/features/settings_source/source.py`, `test/features/settings_source/test_cache.py`
 
 ---
 

@@ -15,10 +15,17 @@ from pydantic2_settings_vault.features.authentication.registry import (
     get_required_env_vars_for_method,
     resolve_auth_method,
 )
+from pydantic2_settings_vault.features.settings_source.cache import (
+    VaultSecretCache,
+    get_shared_secret_cache,
+)
 from pydantic2_settings_vault.shared.infrastructure.kv_paths import (
     normalize_kv_path,
     resolve_kv_version,
     resolve_kv_version_from_env,
+)
+from pydantic2_settings_vault.shared.infrastructure.vault_client_config import (
+    VaultClientConfig,
 )
 from pydantic2_settings_vault.shared.infrastructure.vault_http import InternalHttpVault
 
@@ -28,6 +35,24 @@ logger.addHandler(logging.NullHandler())
 
 class VaultConfigSettingsSource(PydanticBaseSettingsSource):
     CONST_HEADER_X_VAULT_TOKEN: str = "X-Vault-Token"
+
+    def __init__(
+        self,
+        settings_cls,
+        *,
+        client_config: VaultClientConfig | None = None,
+        cache_enabled: bool = False,
+        cache_ttl_seconds: float | None = None,
+        secret_cache: VaultSecretCache | None = None,
+    ) -> None:
+        super().__init__(settings_cls)
+        self._client_config = client_config or VaultClientConfig()
+        if secret_cache is not None:
+            self._secret_cache = secret_cache
+        elif cache_enabled:
+            self._secret_cache = get_shared_secret_cache(ttl_seconds=cache_ttl_seconds)
+        else:
+            self._secret_cache = None
 
     @classmethod
     def _get_auth_backend(cls):
@@ -112,18 +137,33 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
 
             return list(fetch_targets.keys())
 
-        @concurrency_limiter(max_concurrent=5)
+        secret_cache = self._secret_cache
+        client_config = self._client_config
+
+        @concurrency_limiter(max_concurrent=client_config.max_concurrent_requests)
         async def _get_vault_secrets(
             _vault: InternalHttpVault,
             vault_path: str,
             kv_version: int,
         ) -> dict[str, SecretStr]:
-            return await _vault.get_secrets(
+            if secret_cache is not None:
+                cached_secrets = secret_cache.get(vault_path, kv_version)
+                if cached_secrets is not None:
+                    return cached_secrets
+
+            secrets = await _vault.get_secrets(
                 vault_path=vault_path,
                 kv_version=kv_version,
             )
+            if secret_cache is not None:
+                secret_cache.set(vault_path, kv_version, secrets)
+            return secrets
 
-        @reattempt
+        @reattempt(
+            max_retries=client_config.retry_max_attempts,
+            min_time=client_config.retry_min_delay,
+            max_time=client_config.retry_max_delay,
+        )
         async def get_secrets():
             k: dict[str, Any] = {}
 
@@ -132,6 +172,7 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
                 namespace=vault_namespace,
                 auth_backend=auth_backend,
                 default_kv_version=default_kv_version,
+                client_config=client_config,
             ) as vault:
                 fetch_targets = await _get_vault_fetch_targets()
                 vault_secrets_list: list[dict[str, SecretStr]] = await asyncio.gather(

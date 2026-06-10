@@ -9,6 +9,9 @@ from pydantic2_settings_vault.features.authentication.backends import (
     TokenAuthBackend,
 )
 from pydantic2_settings_vault.shared.infrastructure import vault_http
+from pydantic2_settings_vault.shared.infrastructure.vault_client_config import (
+    VaultClientConfig,
+)
 from pydantic2_settings_vault.shared.infrastructure.vault_http import InternalHttpVault
 from test.features.shared.vault_mocks import (
     mock_aiohttp_response,
@@ -90,6 +93,42 @@ async def test_internal_http_vault_get_secrets_network_failure():
         await vault.get_secrets("secret/data/test")
 
     vault.session.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_internal_http_vault_uses_custom_request_timeout(monkeypatch):
+    backend = TokenAuthBackend(token=SecretStr("root-token"))
+    captured_timeouts: list[float] = []
+    original_client_timeout = vault_http.aiohttp.ClientTimeout
+
+    def capture_client_timeout(*, total: float):
+        captured_timeouts.append(total)
+        return original_client_timeout(total=total)
+
+    session = AsyncMock()
+    session.closed = False
+    session.close = AsyncMock()
+
+    monkeypatch.setattr(
+        vault_http.aiohttp,
+        "ClientTimeout",
+        capture_client_timeout,
+    )
+    monkeypatch.setattr(
+        vault_http,
+        "ClientSession",
+        MagicMock(return_value=session),
+    )
+
+    async with InternalHttpVault(
+        url="http://127.0.0.1:8200",
+        namespace=None,
+        auth_backend=backend,
+        client_config=VaultClientConfig(request_timeout=99.0),
+    ):
+        pass
+
+    assert captured_timeouts == [99.0]
 
 
 @pytest.mark.asyncio

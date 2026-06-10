@@ -12,6 +12,9 @@ from pydantic2_settings_vault.shared.infrastructure.kv_paths import (
     normalize_kv_path,
     resolve_kv_version_from_env,
 )
+from pydantic2_settings_vault.shared.infrastructure.vault_client_config import (
+    VaultClientConfig,
+)
 
 CONST_HEADER_X_VAULT_TOKEN: str = "X-Vault-Token"
 CONST_HEADER_X_VAULT_NAMESPACE: str = "X-Vault-Namespace"
@@ -29,6 +32,7 @@ class InternalHttpVault:
         namespace: str | None,
         auth_backend: VaultAuthBackend,
         default_kv_version: int | None = None,
+        client_config: VaultClientConfig | None = None,
     ):
         self.url = url
         self.namespace = namespace
@@ -38,6 +42,10 @@ class InternalHttpVault:
             if default_kv_version is not None
             else resolve_kv_version_from_env()
         )
+        self._client_config = client_config or VaultClientConfig()
+
+    def _request_timeout(self) -> aiohttp.ClientTimeout:
+        return aiohttp.ClientTimeout(total=self._client_config.request_timeout)
 
     def _build_namespace_headers(self) -> dict[str, str]:
         headers: dict[str, str] = {}
@@ -65,9 +73,8 @@ class InternalHttpVault:
 
         if client_ssl is not None:
             connector = aiohttp.TCPConnector(limit=1, ssl=client_ssl)
-            timeout = aiohttp.ClientTimeout(total=30)
             async with ClientSession(
-                connector=connector, timeout=timeout
+                connector=connector, timeout=self._request_timeout()
             ) as login_session:
                 await self._perform_login(
                     login_session,
@@ -109,8 +116,10 @@ class InternalHttpVault:
 
     async def __aenter__(self):
         connector = aiohttp.TCPConnector(limit=10, ssl=ssl_context)
-        timeout = aiohttp.ClientTimeout(total=30)
-        self.session = ClientSession(connector=connector, timeout=timeout)
+        self.session = ClientSession(
+            connector=connector,
+            timeout=self._request_timeout(),
+        )
 
         try:
             await self.authenticate()
