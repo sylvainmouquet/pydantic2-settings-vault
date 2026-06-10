@@ -6,13 +6,24 @@ runs:
   steps:
     - name: Checkout sibling dependencies
       run: |
-        if [ ! -f "../pydocks/pyproject.toml" ]; then
-          git clone --depth 1 https://github.com/sylvainmouquet/pydocks.git ../pydocks
-        fi
-        if [ ! -f "../pycontainers/pyproject.toml" ]; then
-          git clone --depth 1 https://github.com/sylvainmouquet/pycontainer.git ../pycontainers
-        fi
-        if [ ! -f "../proxycraft/pyproject.toml" ]; then
-          git clone --depth 1 https://github.com/sylvainmouquet/proxycraft.git ../proxycraft
+        clone_or_pull() {
+          local dir="$1"
+          local url="$2"
+          if [ ! -f "${dir}/pyproject.toml" ]; then
+            git clone --depth 1 "$url" "$dir"
+          else
+            git -C "$dir" fetch --depth 1 origin main
+            git -C "$dir" reset --hard origin/main
+          fi
+        }
+
+        clone_or_pull ../pydocks https://github.com/sylvainmouquet/pydocks.git
+        clone_or_pull ../pycontainers https://github.com/sylvainmouquet/pycontainer.git
+        clone_or_pull ../proxycraft https://github.com/sylvainmouquet/proxycraft.git
+
+        # Work around pydocks file_exists treating "ko\n" as success (fixed upstream).
+        plugin="../pydocks/pydocks/shared/infrastructure/plugin.py"
+        if grep -q 'if result == "ko":' "$plugin"; then
+          sed -i 's/if result == "ko":/if result.strip() != "ok":/' "$plugin"
         fi
       shell: bash

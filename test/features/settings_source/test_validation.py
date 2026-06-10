@@ -6,7 +6,7 @@ from pydantic2_settings_vault import validate_vault_configuration
 from test.features.settings_source.conftest import (
     configure_vault_env,
     configure_vault_token_env,
-    parse_vault_credentials,
+    fetch_vault_credentials,
 )
 from test.features.settings_source.settings import AppSettings, ValidAppSettings
 
@@ -157,8 +157,7 @@ def test_raise_if_invalid_raises_for_errors(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_validate_auth_check_succeeds(disable_logging_exception, vault_container):
-    credentials = vault_container.execute(["cat", "/vault-credentials.env"])
-    credentials_dict = parse_vault_credentials(credentials)
+    credentials_dict = fetch_vault_credentials(vault_container)
     configure_vault_env(vault_container, credentials_dict)
 
     result = validate_vault_configuration(ValidAppSettings, check_auth=True)
@@ -170,8 +169,7 @@ async def test_validate_auth_check_succeeds(disable_logging_exception, vault_con
 async def test_validate_auth_check_reports_failure(
     disable_logging_exception, vault_container, monkeypatch
 ):
-    credentials = vault_container.execute(["cat", "/vault-credentials.env"])
-    credentials_dict = parse_vault_credentials(credentials)
+    credentials_dict = fetch_vault_credentials(vault_container)
     configure_vault_env(vault_container, credentials_dict)
 
     monkeypatch.setenv("VAULT_SECRET_ID", "invalid-secret-id")
@@ -200,8 +198,7 @@ def test_validate_skips_auth_check_when_env_vars_missing(monkeypatch):
 async def test_validate_auth_check_succeeds_with_token_auth(
     disable_logging_exception, vault_container
 ):
-    credentials = vault_container.execute(["cat", "/vault-credentials.env"])
-    credentials_dict = parse_vault_credentials(credentials)
+    credentials_dict = fetch_vault_credentials(vault_container)
     configure_vault_token_env(vault_container, credentials_dict)
 
     result = validate_vault_configuration(ValidAppSettings, check_auth=True)

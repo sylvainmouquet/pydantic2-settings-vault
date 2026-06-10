@@ -9,7 +9,7 @@ from pydantic_core._pydantic_core import ValidationError
 from test.features.settings_source.conftest import (
     configure_vault_env,
     configure_vault_token_env,
-    parse_vault_credentials,
+    fetch_vault_credentials,
     VAULT_DEV_ROOT_TOKEN,
 )
 from test.features.settings_source.settings import (
@@ -56,8 +56,7 @@ def test_missing_vault_credentials_error_mentions_required_env_vars(monkeypatch)
 @pytest.mark.asyncio
 async def test_valid_get_secret(disable_logging_exception, vault_container):
     # Read the vault credentials from the file
-    credentials = vault_container.execute(["cat", "/vault-credentials.env"])
-    credentials_dict = parse_vault_credentials(credentials)
+    credentials_dict = fetch_vault_credentials(vault_container)
     configure_vault_env(vault_container, credentials_dict)
 
     vault_container.execute(
@@ -74,8 +73,7 @@ async def test_invalid_get_secret(disable_logging_exception, vault_container, ca
     caplog.set_level(logging.ERROR, logger="pydantic2-settings-vault")
 
     # Read the vault credentials from the file
-    credentials = vault_container.execute(["cat", "/vault-credentials.env"])
-    credentials_dict = parse_vault_credentials(credentials)
+    credentials_dict = fetch_vault_credentials(vault_container)
     configure_vault_env(vault_container, credentials_dict)
 
     vault_container.execute(
@@ -95,8 +93,7 @@ async def test_invalid_get_secret(disable_logging_exception, vault_container, ca
 async def test_valid_get_secret_with_token_auth(
     disable_logging_exception, vault_container
 ):
-    credentials = vault_container.execute(["cat", "/vault-credentials.env"])
-    credentials_dict = parse_vault_credentials(credentials)
+    credentials_dict = fetch_vault_credentials(vault_container)
     configure_vault_token_env(vault_container, credentials_dict)
 
     vault_container.execute(
@@ -112,8 +109,7 @@ async def test_valid_get_secret_with_token_auth(
 async def test_valid_get_secret_with_logical_kv2_path(
     disable_logging_exception, vault_container
 ):
-    credentials = vault_container.execute(["cat", "/vault-credentials.env"])
-    credentials_dict = parse_vault_credentials(credentials)
+    credentials_dict = fetch_vault_credentials(vault_container)
     configure_vault_env(vault_container, credentials_dict)
     os.environ.pop("VAULT_KV_VERSION", None)
 
@@ -129,8 +125,7 @@ async def test_valid_get_secret_with_logical_kv2_path(
 async def test_valid_get_secret_with_kv_v1_mount(
     disable_logging_exception, vault_container
 ):
-    credentials = vault_container.execute(["cat", "/vault-credentials.env"])
-    credentials_dict = parse_vault_credentials(credentials)
+    credentials_dict = fetch_vault_credentials(vault_container)
     configure_vault_token_env(vault_container, credentials_dict)
     previous_kv_version = os.environ.get("VAULT_KV_VERSION")
     os.environ["VAULT_KV_VERSION"] = "1"
