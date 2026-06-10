@@ -147,15 +147,15 @@ Reduce repeated Vault calls when multiple fields reference the same path/key or 
 
 ### 11. Developer-facing diagnostics
 
-**Status:** Planned
+**Status:** Done
 
 Improve error messages and logs so setup issues are easier to understand during local development and deployment.
 
-- [ ] Clarify missing environment variable errors
-- [ ] Include Vault path/key context in safe error messages
-- [ ] Keep sensitive values out of logs and exceptions
+- [x] Clarify missing environment variable errors
+- [x] Include Vault path/key context in safe error messages
+- [x] Keep sensitive values out of logs and exceptions
 
-**Potential files:** `pydantic2_settings_vault/__init__.py`
+**Key files:** `pydantic2_settings_vault/features/settings_source/source.py`, `pydantic2_settings_vault/shared/infrastructure/vault_http.py`, `test/features/settings_source/test_settings.py`
 
 ### 12. Configuration validation helper
 
@@ -174,17 +174,18 @@ Provide a lightweight way to validate Vault connectivity, authentication, and fi
 
 ## New Opportunities
 
-### 13. Extensible backend support
+### 13. Advanced HashiCorp Vault support
 
 **Status:** Planned
 
-Allow future extensions so users can add support for secret stores beyond HashiCorp Vault.
+Deepen HashiCorp Vault integration so the library covers more real-world deployment patterns without adding other secret backends.
 
-- [ ] Define a backend interface for secret providers
-- [ ] Explore AWS Secrets Manager support
-- [ ] Explore Azure Key Vault support
+- [ ] Explore additional Vault authentication methods beyond AppRole
+- [ ] Support KV engine version selection and path conventions
+- [ ] Explore Vault namespace and enterprise-compatible configuration
+- [ ] Document recommended Vault policies and field-mapping patterns
 
-**Potential files:** `pydantic2_settings_vault/__init__.py`, `pydantic2_settings_vault/backends/`
+**Potential files:** `pydantic2_settings_vault/shared/infrastructure/vault_http.py`, `pydantic2_settings_vault/features/settings_source/source.py`, `tests/`, `README.md`
 
 ### 14. Vault token lifecycle management
 

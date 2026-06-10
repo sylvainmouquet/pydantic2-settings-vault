@@ -18,6 +18,47 @@ logger.addHandler(logging.NullHandler())
 
 class VaultConfigSettingsSource(PydanticBaseSettingsSource):
     CONST_HEADER_X_VAULT_TOKEN: str = "X-Vault-Token"
+    REQUIRED_AUTH_ENV_VARS: tuple[str, str] = ("VAULT_ROLE_ID", "VAULT_SECRET_ID")
+
+    @classmethod
+    def _get_vault_credentials(cls) -> tuple[SecretStr, SecretStr]:
+        missing_env_vars = [
+            env_var for env_var in cls.REQUIRED_AUTH_ENV_VARS if not os.getenv(env_var)
+        ]
+
+        if missing_env_vars:
+            missing_env_vars_text = ", ".join(missing_env_vars)
+            raise ValueError(
+                "Missing required Vault environment variables: "
+                f"{missing_env_vars_text}. Configure AppRole credentials before "
+                "loading Vault-backed settings."
+            )
+
+        return (
+            SecretStr(os.environ["VAULT_ROLE_ID"]),
+            SecretStr(os.environ["VAULT_SECRET_ID"]),
+        )
+
+    @staticmethod
+    def _get_field_vault_metadata(field_name: str, field: FieldInfo) -> tuple[str, str]:
+        field_metadata = field.json_schema_extra or {}
+        missing_metadata = [
+            metadata_key
+            for metadata_key in ("vault_secret_path", "vault_secret_key")
+            if not field_metadata.get(metadata_key)
+        ]
+
+        if missing_metadata:
+            missing_metadata_text = ", ".join(missing_metadata)
+            raise ValueError(
+                "Vault metadata for settings field "
+                f"'{field_name}' is incomplete. Missing: {missing_metadata_text}."
+            )
+
+        return (
+            str(field_metadata["vault_secret_path"]),
+            str(field_metadata["vault_secret_key"]),
+        )
 
     def get_field_value(
         self, field: FieldInfo, field_name: str
@@ -34,14 +75,7 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
     def __call__(self) -> dict[str, Any]:
         vault_url: str = os.getenv("VAULT_URL", default="http://127.0.0.1:8200")
         vault_namespace: str | None = os.getenv("VAULT_NAMESPACE")
-        vault_role_id: SecretStr = SecretStr(os.getenv("VAULT_ROLE_ID"))
-        vault_secret_id: SecretStr = SecretStr(os.getenv("VAULT_SECRET_ID"))
-
-        if (
-            not vault_role_id.get_secret_value()
-            or not vault_secret_id.get_secret_value()
-        ):
-            raise ValueError("VAULT_ROLE_ID and VAULT_SECRET_ID are mandatory")
+        vault_role_id, vault_secret_id = self._get_vault_credentials()
 
         d: dict[str, Any] = {}
 
@@ -52,7 +86,9 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
                 lambda item: item[1].json_schema_extra,
                 self.settings_cls.model_fields.items(),
             ):
-                vault_path: str = field.json_schema_extra["vault_secret_path"]  # type: ignore
+                vault_path, _vault_secret_key = self._get_field_vault_metadata(
+                    field_name=_fieldname, field=field
+                )
                 if vault_path not in vault_path_list:
                     vault_path_list.append(vault_path)
 
@@ -91,14 +127,22 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
                 lambda item: item[1].json_schema_extra,
                 self.settings_cls.model_fields.items(),
             ):
-                vault_secret_key: str = field.json_schema_extra["vault_secret_key"]  # type: ignore
+                vault_path, vault_secret_key = self._get_field_vault_metadata(
+                    field_name=field_name, field=field
+                )
 
                 if vault_secret_key in vault_secrets_dict:
                     k[field_name] = vault_secrets_dict[
                         vault_secret_key
                     ].get_secret_value()
                 else:
-                    logger.error(f"Key {vault_secret_key} not found in the Vault")
+                    logger.error(
+                        "Vault secret key %r for settings field %r was not found "
+                        "at Vault path %r",
+                        vault_secret_key,
+                        field_name,
+                        vault_path,
+                    )
             return k
 
         def run_async_method():

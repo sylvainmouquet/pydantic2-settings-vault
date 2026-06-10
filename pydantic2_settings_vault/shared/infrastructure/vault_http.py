@@ -46,7 +46,8 @@ class InternalHttpVault:
                 else:
                     error_msg = await response.text()
                     raise ValueError(
-                        f"Failed to authenticate. Error code: {response.status}. Error message: {error_msg}"
+                        "Failed to authenticate with Vault AppRole. "
+                        f"Error code: {response.status}. Error message: {error_msg}"
                     )
         except Exception as e:
             await self.session.close()
@@ -80,7 +81,8 @@ class InternalHttpVault:
                 else:
                     error_msg = await response.text()
                     raise ValueError(
-                        f"Failed to retrieve secret. Error code: {response.status}. Error message: {error_msg}"
+                        f"Failed to retrieve secret from Vault path '{vault_path}'. "
+                        f"Error code: {response.status}. Error message: {error_msg}"
                     )
         except Exception as e:
             await self.session.close()
