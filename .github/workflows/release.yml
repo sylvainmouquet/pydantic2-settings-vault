@@ -25,6 +25,7 @@ jobs:
         uses: astral-sh/setup-uv@v2
       - name: Install just
         uses: extractions/setup-just@v3
+      - uses: ./.github/actions/checkout-sibling-deps
       - name: Use uv with Python version
         run: uv venv --python 3.14
       - run: just install

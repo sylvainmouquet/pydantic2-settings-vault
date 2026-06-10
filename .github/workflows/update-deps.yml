@@ -27,6 +27,8 @@ jobs:
       - name: Install just
         uses: extractions/setup-just@v3
 
+      - uses: ./.github/actions/checkout-sibling-deps
+
       - name: Use uv with Python version
         run: uv venv --python 3.13
 
