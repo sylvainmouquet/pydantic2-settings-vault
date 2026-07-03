@@ -18,7 +18,7 @@ from pydantic2_settings_vault.shared.infrastructure.kv_paths import (
 )
 from pydantic2_settings_vault.shared.infrastructure.vault_http import InternalHttpVault
 
-VAULT_METADATA_KEYS: tuple[str, str] = ("vault_secret_path", "vault_secret_key")
+VAULT_METADATA_KEYS: tuple[str] = ("vault_secret_path", "vault_secret_key", "vault_engine_type")
 
 
 @dataclass(frozen=True)

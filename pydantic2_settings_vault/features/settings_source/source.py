@@ -74,11 +74,11 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
         return get_auth_backend_from_env()
 
     @staticmethod
-    def _get_field_vault_metadata(field_name: str, field: FieldInfo) -> tuple[str, str]:
+    def _get_field_vault_metadata(field_name: str, field: FieldInfo) -> tuple[str, str, str]:
         field_metadata = field.json_schema_extra or {}
         missing_metadata = [
             metadata_key
-            for metadata_key in ("vault_secret_path", "vault_secret_key")
+            for metadata_key in ("vault_secret_path", "vault_secret_key", "vault_engine_type")
             if not field_metadata.get(metadata_key)
         ]
 
@@ -92,6 +92,7 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
         return (
             str(field_metadata["vault_secret_path"]),
             str(field_metadata["vault_secret_key"]),
+            str(field_metadata["vault_engine_type"]),
         )
 
     def get_field_value(
@@ -114,26 +115,31 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
 
         d: dict[str, Any] = {}
 
-        async def _get_vault_fetch_targets() -> list[tuple[str, int]]:
+        async def _get_vault_fetch_targets() -> list[tuple[str, int, str]]:
             """Collect unique Vault paths to fetch, normalized per KV version."""
-            fetch_targets: dict[tuple[str, int], None] = {}
+            fetch_targets: dict[tuple[str, int, str], None] = {}
             for _fieldname, field in filter(
                 lambda item: item[1].json_schema_extra,
                 self.settings_cls.model_fields.items(),
             ):
-                vault_path, _vault_secret_key = self._get_field_vault_metadata(
+                vault_path, _vault_secret_key, vault_engine_type = self._get_field_vault_metadata(
                     field_name=_fieldname, field=field
                 )
                 field_metadata = field.json_schema_extra
                 metadata_dict = (
                     field_metadata if isinstance(field_metadata, dict) else {}
                 )
-                kv_version = resolve_kv_version(
-                    metadata_dict,
-                    default=default_kv_version,
-                )
-                normalized_path = normalize_kv_path(vault_path, kv_version)
-                fetch_targets[(normalized_path, kv_version)] = None
+                if vault_engine_type == 'kv':
+                    kv_version = resolve_kv_version(
+                        metadata_dict,
+                        default=default_kv_version,
+                    )
+                    normalized_path = normalize_kv_path(vault_path, kv_version)
+                elif vault_engine_type == 'creds':
+                    kv_version = 0
+                    normalized_path = vault_path
+                
+                fetch_targets[(normalized_path, kv_version, vault_engine_type)] = None
 
             return list(fetch_targets.keys())
 
@@ -145,18 +151,20 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
             _vault: InternalHttpVault,
             vault_path: str,
             kv_version: int,
+            vault_engine_type: str,
         ) -> dict[str, SecretStr]:
             if secret_cache is not None:
-                cached_secrets = secret_cache.get(vault_path, kv_version)
+                cached_secrets = secret_cache.get(vault_path, kv_version, vault_engine_type)
                 if cached_secrets is not None:
                     return cached_secrets
 
             secrets = await _vault.get_secrets(
                 vault_path=vault_path,
                 kv_version=kv_version,
+                vault_engine_type=vault_engine_type,
             )
             if secret_cache is not None:
-                secret_cache.set(vault_path, kv_version, secrets)
+                secret_cache.set(vault_path, kv_version, vault_engine_type, secrets)
             return secrets
 
         @reattempt(
@@ -181,8 +189,9 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
                             _vault=vault,
                             vault_path=vault_path,
                             kv_version=kv_version,
+                            vault_engine_type=vault_engine_type,
                         )
-                        for vault_path, kv_version in fetch_targets
+                        for vault_path, kv_version, vault_engine_type in fetch_targets
                     ]
                 )
 
@@ -195,14 +204,19 @@ class VaultConfigSettingsSource(PydanticBaseSettingsSource):
                 lambda item: item[1].json_schema_extra,
                 self.settings_cls.model_fields.items(),
             ):
-                vault_path, vault_secret_key = self._get_field_vault_metadata(
+                vault_path, vault_secret_key, vault_engine_type = self._get_field_vault_metadata(
                     field_name=field_name, field=field
                 )
 
                 if vault_secret_key in vault_secrets_dict:
-                    k[field_name] = vault_secrets_dict[
-                        vault_secret_key
-                    ].get_secret_value()
+                    if isinstance(vault_secrets_dict[vault_secret_key], SecretStr):
+                        k[field_name] = vault_secrets_dict[
+                            vault_secret_key
+                        ].get_secret_value()
+                    else:
+                        k[field_name] = vault_secrets_dict[
+                            vault_secret_key
+                        ]
                 else:
                     logger.error(
                         "Vault secret key %r for settings field %r was not found "

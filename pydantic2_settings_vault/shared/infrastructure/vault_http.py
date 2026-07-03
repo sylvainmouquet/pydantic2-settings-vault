@@ -1,9 +1,11 @@
+from datetime import datetime, timedelta
 from http import HTTPStatus
 import ssl
+from typing import Literal
 
 import aiohttp
+import truststore
 from aiohttp import ClientSession
-import certifi
 from pydantic import SecretStr
 
 from pydantic2_settings_vault.features.authentication.backends import VaultAuthBackend
@@ -12,6 +14,9 @@ from pydantic2_settings_vault.shared.infrastructure.kv_paths import (
     normalize_kv_path,
     resolve_kv_version_from_env,
 )
+from pydantic2_settings_vault.shared.infrastructure.creds_paths import (
+    extract_creds_secret_data
+)
 from pydantic2_settings_vault.shared.infrastructure.vault_client_config import (
     VaultClientConfig,
 )
@@ -19,7 +24,7 @@ from pydantic2_settings_vault.shared.infrastructure.vault_client_config import (
 CONST_HEADER_X_VAULT_TOKEN: str = "X-Vault-Token"
 CONST_HEADER_X_VAULT_NAMESPACE: str = "X-Vault-Namespace"
 
-ssl_context = ssl.create_default_context(cafile=certifi.where())
+ssl_context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 
 
 class InternalHttpVault:
@@ -137,10 +142,59 @@ class InternalHttpVault:
         self,
         vault_path: str,
         kv_version: int | None = None,
+        vault_engine_type: Literal['kv', 'creds'] = 'kv',
     ) -> dict[str, SecretStr]:
         if not self.token:
             raise ValueError("Authentication is mandatory")
 
+        if vault_engine_type == 'kv':
+            return await self.get_kv_secrets(vault_path, kv_version)
+        elif vault_engine_type == 'creds':
+            return await self.get_creds_secrets(vault_path)
+        else:
+            raise ValueError(f"Engine type {vault_engine_type} is not supported")
+    
+    async def get_creds_secrets(
+        self,
+        vault_path: str
+    ) -> dict[str, SecretStr | int]:
+        try:
+            headers = {
+                CONST_HEADER_X_VAULT_TOKEN: self.token.get_secret_value(),
+                **self._build_namespace_headers(),
+            }
+            async with self.session.get(
+                f"{self.url}/v1/{vault_path}",
+                headers=headers,
+            ) as response:
+                if response.status == HTTPStatus.OK:
+                    secrets = await response.json()
+                    ttl = secrets.get("lease_duration")
+                    iat = datetime.now()
+                    exp = iat + timedelta(seconds=ttl)
+                    secret_data = extract_creds_secret_data(secrets)
+                    result = {
+                        key: SecretStr(value) for key, value in secret_data.items()
+                    }
+                    result.update({'ttl': ttl, 'iat': iat, 'exp': exp})
+
+                    return result
+
+                error_msg = await response.text()
+                raise ValueError(
+                    f"Failed to retrieve secret from Vault path '{vault_path}'. "
+                    f"Error code: {response.status}. Error message: {error_msg}"
+                )
+        except Exception as exc:
+            await self.session.close()
+            raise exc
+
+
+    async def get_kv_secrets(
+        self,
+        vault_path: str,
+        kv_version: int | None = None,
+    ) -> dict[str, SecretStr]:
         resolved_kv_version = (
             kv_version if kv_version is not None else self.default_kv_version
         )

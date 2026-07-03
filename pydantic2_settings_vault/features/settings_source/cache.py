@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from pydantic import SecretStr
 
-_CACHE_KEY = tuple[str, int]
+_CACHE_KEY = tuple[str, int, str]
 
 
 @dataclass(frozen=True)
@@ -19,8 +19,8 @@ class VaultSecretCache:
         self._ttl_seconds = ttl_seconds
         self._entries: dict[_CACHE_KEY, _CacheEntry] = {}
 
-    def get(self, vault_path: str, kv_version: int) -> dict[str, SecretStr] | None:
-        key = (vault_path, kv_version)
+    def get(self, vault_path: str, kv_version: int, vault_engine_type: str) -> dict[str, SecretStr] | None:
+        key = (vault_path, kv_version, vault_engine_type)
         entry = self._entries.get(key)
         if entry is None:
             return None
@@ -33,6 +33,7 @@ class VaultSecretCache:
         self,
         vault_path: str,
         kv_version: int,
+        vault_engine_type: str,
         secrets: dict[str, SecretStr],
     ) -> None:
         expires_at = (
@@ -40,7 +41,7 @@ class VaultSecretCache:
             if self._ttl_seconds is not None
             else float("inf")
         )
-        self._entries[(vault_path, kv_version)] = _CacheEntry(
+        self._entries[(vault_path, kv_version, vault_engine_type)] = _CacheEntry(
             secrets=secrets,
             expires_at=expires_at,
         )

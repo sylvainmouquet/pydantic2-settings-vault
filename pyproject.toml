@@ -7,12 +7,12 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "aiohttp>=3.10.10",
-    "certifi>=2025.1.31",
     "concurrency-limiter>=1.1.0",
     "cryptography>=46.0.7",
     "pydantic>=2.9.2",
     "pydantic-settings>=2.6.0",
     "reattempt>=1.1.3",
+    "truststore>=0.10.4"
 ]
 license = { text = "MIT" }
 url = "https://github.com/sylvainmouquet/pydantic2-settings-vault"
